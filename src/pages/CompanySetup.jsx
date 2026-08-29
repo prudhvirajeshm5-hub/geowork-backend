@@ -7,6 +7,14 @@ import { Alert, EmptyState, Field, Loading, Modal, StatusBadge } from "../compon
 const TABS = ["Profile", "Branches", "Departments", "Designations", "Shifts"];
 const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
+function slugify(value) {
+  return value
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "");
+}
+
 export default function CompanySetup() {
   const [tab, setTab] = useState("Profile");
 
@@ -40,7 +48,111 @@ export default function CompanySetup() {
 /* ---------------------------------- Profile ---------------------------------- */
 
 function ProfileTab() {
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
+
+  // A user with no company yet (fresh ADMIN-role account, nothing set up
+  // in Django admin) sets up their company right here — no separate
+  // "assign company to user" step needed. See CompanyViewSet.perform_create.
+  if (!user?.company) {
+    return <CreateCompanyForm onCreated={refreshUser} />;
+  }
+
+  return <EditCompanyForm companyId={user.company} />;
+}
+
+function CreateCompanyForm({ onCreated }) {
+  const [form, setForm] = useState({
+    name: "",
+    slug: "",
+    contact_email: "",
+    contact_phone: "",
+    gstin: "",
+    timezone: "Asia/Kolkata",
+    registered_address: "",
+  });
+  const [slugTouched, setSlugTouched] = useState(false);
+  const [error, setError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  const set = (k) => (e) => {
+    const value = e.target.value;
+    setForm((f) => ({
+      ...f,
+      [k]: value,
+      // Keep the slug in sync with the name until the person edits the
+      // slug field directly themselves.
+      slug: k === "name" && !slugTouched ? slugify(value) : f.slug,
+    }));
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setSubmitting(true);
+    setError("");
+    try {
+      await api.post("/company/companies/", form);
+      await onCreated();
+    } catch (err) {
+      setError(apiErrorMessage(err, "Couldn't set up the company."));
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="card card-pad" style={{ maxWidth: 640 }}>
+      <div style={{ marginBottom: 16 }}>
+        <h3 style={{ margin: 0 }}>Set up your company</h3>
+        <p className="card-head-sub" style={{ marginTop: 4 }}>
+          This account isn't tied to a company yet. Fill this in once to get started — you'll be able to add branches, departments and shifts right after.
+        </p>
+      </div>
+      <form onSubmit={handleSubmit}>
+        <Alert>{error}</Alert>
+        <div className="form-grid">
+          <Field label="Company name">
+            <input className="input" required value={form.name} onChange={set("name")} />
+          </Field>
+          <Field label="Slug" hint="Used internally to identify your company">
+            <input
+              className="input"
+              required
+              value={form.slug}
+              onChange={(e) => {
+                setSlugTouched(true);
+                set("slug")(e);
+              }}
+            />
+          </Field>
+          <Field label="Contact email">
+            <input className="input" type="email" value={form.contact_email} onChange={set("contact_email")} />
+          </Field>
+          <Field label="Contact phone">
+            <input className="input" value={form.contact_phone} onChange={set("contact_phone")} />
+          </Field>
+          <Field label="GSTIN">
+            <input className="input" value={form.gstin} onChange={set("gstin")} />
+          </Field>
+          <Field label="Timezone">
+            <input className="input" value={form.timezone} onChange={set("timezone")} />
+          </Field>
+        </div>
+        <div className="form-grid cols-1" style={{ marginTop: 14 }}>
+          <Field label="Registered address">
+            <textarea className="input" value={form.registered_address} onChange={set("registered_address")} />
+          </Field>
+        </div>
+        <div className="form-actions" style={{ justifyContent: "flex-start" }}>
+          <button className="btn btn-primary" disabled={submitting}>
+            {submitting ? "Setting up…" : "Create company"}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+function EditCompanyForm({ companyId }) {
   const [company, setCompany] = useState(null);
   const [form, setForm] = useState(null);
   const [error, setError] = useState("");
@@ -48,12 +160,8 @@ function ProfileTab() {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    if (!user?.company) {
-      setError("This account has no company assigned, so there's no profile to load.");
-      return;
-    }
     api
-      .get(`/company/companies/${user.company}/`)
+      .get(`/company/companies/${companyId}/`)
       .then(({ data }) => {
         setCompany(data);
         setForm(data);
@@ -65,7 +173,7 @@ function ProfileTab() {
         // anything had gone wrong.
         setError(apiErrorMessage(err, "Couldn't load the company profile."));
       });
-  }, [user]);
+  }, [companyId]);
 
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
 
