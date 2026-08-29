@@ -1,20 +1,6 @@
-# Python / Django
 venv/
 __pycache__/
 *.pyc
-*.sqlite3
-staticfiles/
-media/
-.env
-
-# Frontend
 node_modules/
 dist/
-
-# Editor / OS cruft
-.DS_Store
-.idea/
-.vscode/
-
-# Local backup folder from earlier troubleshooting — not part of the app
-src_broken_backup/
+.env
