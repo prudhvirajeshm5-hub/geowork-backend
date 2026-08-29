@@ -1,0 +1,1532 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>GeoWork Pro — Ops Console</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css" />
+<style>
+  :root{
+    --bg:#F5F7FA; --surface:#FFFFFF; --ink:#101828; --muted:#667085; --border:#E4E7EC;
+    --sidebar-bg:#0B1220; --sidebar-ink:#93A1B8; --sidebar-ink-active:#F5F7FA; --sidebar-active:#152238;
+    --accent:#0D9488; --accent-ink:#FFFFFF; --accent-dim:#CCFBF1;
+    --success:#059669; --success-bg:#ECFDF5;
+    --warning:#D97706; --warning-bg:#FFFBEB;
+    --danger:#DC2626; --danger-bg:#FEF2F2;
+    --info:#2563EB; --info-bg:#EFF6FF;
+    --violet:#7C3AED; --violet-bg:#F5F3FF;
+    --radius:10px; --radius-sm:6px;
+    --shadow: 0 1px 2px rgba(16,24,40,.06), 0 1px 3px rgba(16,24,40,.08);
+    --font-display: 'Space Grotesk', ui-sans-serif, system-ui, sans-serif;
+    --font-body: -apple-system, BlinkMacSystemFont, 'Segoe UI', ui-sans-serif, system-ui, sans-serif;
+    --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;height:100%;background:var(--bg);color:var(--ink);font-family:var(--font-body);font-size:14px;}
+  h1,h2,h3,h4{font-family:var(--font-display);font-weight:600;margin:0 0 4px;}
+  a{color:var(--accent);}
+  button{font-family:var(--font-body);cursor:pointer;}
+  input,select,textarea{font-family:var(--font-body);font-size:14px;}
+  :focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
+  code, .mono{font-family:var(--font-mono);}
+
+  /* ---------- Layout ---------- */
+  #app{display:flex;min-height:100vh;}
+  #sidebar{
+    width:230px;flex-shrink:0;background:var(--sidebar-bg);color:var(--sidebar-ink);
+    display:flex;flex-direction:column;position:sticky;top:0;height:100vh;
+  }
+  #sidebar .brand{padding:20px 18px 14px;border-bottom:1px solid rgba(255,255,255,.08);}
+  #sidebar .brand .mark{display:flex;align-items:center;gap:8px;}
+  #sidebar .brand .dot{width:10px;height:10px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 3px rgba(13,148,136,.25);}
+  #sidebar .brand h1{color:#fff;font-size:16px;letter-spacing:.2px;}
+  #sidebar .brand .sub{font-size:11px;color:var(--sidebar-ink);margin-top:2px;letter-spacing:.4px;text-transform:uppercase;}
+  #nav{flex:1;padding:10px;overflow-y:auto;}
+  .nav-item{
+    display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:var(--radius-sm);
+    color:var(--sidebar-ink);text-decoration:none;font-size:13.5px;margin-bottom:2px;cursor:pointer;
+    border:1px solid transparent;
+  }
+  .nav-item:hover{background:rgba(255,255,255,.05);color:var(--sidebar-ink-active);}
+  .nav-item.active{background:var(--sidebar-active);color:var(--sidebar-ink-active);border-color:rgba(13,148,136,.35);}
+  .nav-item .ic{width:16px;text-align:center;font-size:14px;}
+  .nav-item .pulse{width:7px;height:7px;border-radius:50%;background:var(--success);margin-left:auto;
+    box-shadow:0 0 0 0 rgba(5,150,105,.6);animation:pulse 2s infinite;}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(5,150,105,.5);}70%{box-shadow:0 0 0 6px rgba(5,150,105,0);}100%{box-shadow:0 0 0 0 rgba(5,150,105,0);}}
+  .nav-badge{margin-left:auto;background:var(--danger);color:#fff;font-size:10.5px;font-weight:700;
+    padding:1px 6px;border-radius:999px;min-width:16px;text-align:center;}
+  #sidebar .foot{padding:12px 16px;border-top:1px solid rgba(255,255,255,.08);font-size:11px;color:#5D6B85;}
+
+  #main{flex:1;min-width:0;display:flex;flex-direction:column;}
+  #topbar{
+    height:58px;flex-shrink:0;background:var(--surface);border-bottom:1px solid var(--border);
+    display:flex;align-items:center;justify-content:space-between;padding:0 22px;position:sticky;top:0;z-index:20;
+  }
+  #topbar .page-title{font-size:16px;font-weight:600;font-family:var(--font-display);}
+  #topbar .right{display:flex;align-items:center;gap:14px;}
+  .api-chip{
+    display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--muted);
+    background:var(--bg);border:1px solid var(--border);border-radius:999px;padding:5px 10px;cursor:pointer;
+  }
+  .api-chip .dot{width:7px;height:7px;border-radius:50%;background:#9AA4B2;}
+  .api-chip.online .dot{background:var(--success);}
+  .api-chip.offline .dot{background:var(--danger);}
+  .user-chip{display:flex;align-items:center;gap:8px;font-size:12.5px;}
+  .user-chip .avatar{width:28px;height:28px;border-radius:50%;background:var(--accent);color:#fff;
+    display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;font-family:var(--font-display);}
+  .user-chip .who{display:flex;flex-direction:column;line-height:1.25;}
+  .user-chip .who b{font-size:12.5px;}
+  .user-chip .who span{font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.3px;}
+  .btn-ghost-sm{background:none;border:1px solid var(--border);border-radius:var(--radius-sm);padding:6px 10px;
+    font-size:12.5px;color:var(--muted);}
+  .btn-ghost-sm:hover{background:var(--bg);}
+
+  #content{flex:1;padding:22px;overflow-y:auto;}
+  .page{max-width:1280px;margin:0 auto;}
+  .page-desc{color:var(--muted);font-size:13px;margin-bottom:18px;}
+
+  /* ---------- Cards / grid ---------- */
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px;box-shadow:var(--shadow);}
+  .card + .card{margin-top:16px;}
+  .card-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;}
+  .card-head h3{font-size:14.5px;}
+  .card-head .hint{font-size:11.5px;color:var(--muted);font-weight:400;}
+  .grid{display:grid;gap:16px;}
+  .grid-2{grid-template-columns:1fr 1fr;}
+  .grid-3{grid-template-columns:1fr 1fr 1fr;}
+  @media (max-width:980px){.grid-2,.grid-3{grid-template-columns:1fr;}}
+
+  /* ---------- Tiles (dashboard) ---------- */
+  .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;}
+  .tile{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px;position:relative;overflow:hidden;}
+  .tile .num{font-family:var(--font-display);font-size:28px;font-weight:700;}
+  .tile .label{font-size:11.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-top:2px;}
+  .tile .bar{position:absolute;left:0;top:0;bottom:0;width:4px;}
+  .tile.t-total .bar{background:var(--ink);} .tile.t-present .bar{background:var(--success);}
+  .tile.t-absent .bar{background:var(--danger);} .tile.t-halfday .bar{background:var(--warning);}
+  .tile.t-late .bar{background:var(--warning);} .tile.t-working .bar{background:var(--info);}
+  .tile.t-outside .bar{background:#EA580C;} .tile.t-gps .bar{background:var(--violet);}
+  .tile.t-jobs{opacity:.55;}
+
+  /* ---------- Forms ---------- */
+  .field{margin-bottom:12px;}
+  .field label{display:block;font-size:12px;font-weight:600;color:var(--muted);margin-bottom:5px;}
+  .field .req{color:var(--danger);}
+  input[type=text],input[type=password],input[type=email],input[type=number],input[type=date],
+  input[type=time],input[type=datetime-local],select,textarea{
+    width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:var(--radius-sm);
+    background:#fff;color:var(--ink);
+  }
+  textarea{resize:vertical;min-height:60px;}
+  input[type=color]{width:44px;height:32px;border:1px solid var(--border);border-radius:var(--radius-sm);padding:2px;background:#fff;}
+  .checkline{display:flex;align-items:center;gap:8px;font-size:13px;}
+  .form-row{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;}
+  .form-row .field{flex:1;min-width:140px;margin-bottom:0;}
+
+  /* ---------- Buttons ---------- */
+  .btn{border:none;border-radius:var(--radius-sm);padding:9px 16px;font-size:13px;font-weight:600;
+    display:inline-flex;align-items:center;gap:6px;}
+  .btn-primary{background:var(--accent);color:var(--accent-ink);}
+  .btn-primary:hover{background:#0B7A6F;}
+  .btn-secondary{background:var(--surface);color:var(--ink);border:1px solid var(--border);}
+  .btn-secondary:hover{background:var(--bg);}
+  .btn-danger{background:var(--danger-bg);color:var(--danger);border:1px solid #FCA5A5;}
+  .btn-sm{padding:5px 10px;font-size:12px;}
+  .btn:disabled{opacity:.5;cursor:not-allowed;}
+  .btn-row{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap;}
+
+  /* ---------- Table ---------- */
+  table{width:100%;border-collapse:collapse;font-size:13px;}
+  thead th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.3px;color:var(--muted);
+    border-bottom:1px solid var(--border);padding:8px 10px;white-space:nowrap;}
+  tbody td{padding:9px 10px;border-bottom:1px solid #EFF1F4;vertical-align:middle;}
+  tbody tr:hover{background:#FAFBFC;}
+  .table-wrap{overflow-x:auto;}
+  .empty-row td{text-align:center;color:var(--muted);padding:26px;}
+
+  /* ---------- Pills / badges ---------- */
+  .pill{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:999px;font-size:11px;font-weight:700;letter-spacing:.2px;}
+  .pill-green{background:var(--success-bg);color:var(--success);}
+  .pill-red{background:var(--danger-bg);color:var(--danger);}
+  .pill-amber{background:var(--warning-bg);color:var(--warning);}
+  .pill-blue{background:var(--info-bg);color:var(--info);}
+  .pill-violet{background:var(--violet-bg);color:var(--violet);}
+  .pill-gray{background:#F2F4F7;color:var(--muted);}
+  .swatch{width:11px;height:11px;border-radius:3px;display:inline-block;border:1px solid rgba(0,0,0,.15);}
+
+  /* ---------- Tabs ---------- */
+  .tabs{display:flex;gap:2px;border-bottom:1px solid var(--border);margin-bottom:16px;}
+  .tab{padding:9px 14px;font-size:13px;font-weight:600;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;}
+  .tab.active{color:var(--accent);border-color:var(--accent);}
+
+  /* ---------- Alerts / toasts ---------- */
+  #toasts{position:fixed;top:16px;right:16px;z-index:200;display:flex;flex-direction:column;gap:8px;max-width:360px;}
+  .toast{background:var(--ink);color:#fff;padding:12px 14px;border-radius:var(--radius-sm);font-size:13px;
+    box-shadow:var(--shadow);animation:slidein .18s ease-out;}
+  .toast.err{background:var(--danger);}
+  .toast.ok{background:var(--success);}
+  @keyframes slidein{from{transform:translateY(-6px);opacity:0;}to{transform:translateY(0);opacity:1;}}
+  .banner{padding:10px 14px;border-radius:var(--radius-sm);font-size:13px;margin-bottom:14px;}
+  .banner.err{background:var(--danger-bg);color:var(--danger);border:1px solid #FCA5A5;}
+  .banner.ok{background:var(--success-bg);color:var(--success);border:1px solid #A7F3D0;}
+  .banner.info{background:var(--info-bg);color:var(--info);border:1px solid #BFDBFE;}
+
+  /* ---------- Login ---------- */
+  #login-screen{min-height:100vh;display:flex;align-items:center;justify-content:center;background:
+    radial-gradient(1200px 600px at 15% -10%, #12233d 0%, transparent 60%),
+    radial-gradient(1000px 500px at 110% 10%, #0d3a34 0%, transparent 55%), var(--sidebar-bg);}
+  .login-card{width:380px;background:var(--surface);border-radius:14px;padding:30px 28px;box-shadow:0 20px 60px rgba(0,0,0,.35);}
+  .login-mark{display:flex;align-items:center;gap:9px;margin-bottom:4px;}
+  .login-mark .dot{width:11px;height:11px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 4px rgba(13,148,136,.2);}
+  .login-mark h1{font-size:18px;}
+  .login-sub{color:var(--muted);font-size:12.5px;margin-bottom:22px;}
+  .login-toggle{display:flex;background:var(--bg);border-radius:999px;padding:3px;margin-bottom:18px;}
+  .login-toggle button{flex:1;background:none;border:none;padding:7px;border-radius:999px;font-size:12.5px;font-weight:600;color:var(--muted);}
+  .login-toggle button.active{background:#fff;color:var(--ink);box-shadow:var(--shadow);}
+  .settings-pop{position:absolute;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+    box-shadow:var(--shadow);padding:14px;width:320px;z-index:100;}
+
+  .muted{color:var(--muted);}
+  .small{font-size:11.5px;}
+  .modal-backdrop{position:fixed;inset:0;background:rgba(16,24,40,.45);display:flex;align-items:center;justify-content:center;z-index:150;padding:20px;}
+  .modal{background:#fff;border-radius:var(--radius);max-width:640px;width:100%;max-height:88vh;overflow-y:auto;padding:22px;box-shadow:0 20px 60px rgba(0,0,0,.3);}
+  .modal-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;}
+  .x-close{background:none;border:none;font-size:20px;color:var(--muted);line-height:1;}
+
+  #geo-map{height:460px;border-radius:var(--radius);border:1px solid var(--border);}
+  .legend{display:flex;gap:14px;flex-wrap:wrap;margin-top:10px;font-size:12px;color:var(--muted);}
+  .legend span{display:inline-flex;align-items:center;gap:5px;}
+
+  .spinner{width:14px;height:14px;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:spin .6s linear infinite;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+</style>
+</head>
+<body>
+
+<div id="toasts"></div>
+
+<!-- ===================== LOGIN SCREEN ===================== -->
+<div id="login-screen">
+  <div class="login-card">
+    <div class="login-mark"><span class="dot"></span><h1>GeoWork Pro</h1></div>
+    <div class="login-sub">Ops console — Modules 1–9 test harness</div>
+
+    <div id="login-banner"></div>
+
+    <div class="login-toggle">
+      <button id="tab-pw" class="active" onclick="setLoginMode('password')">Password</button>
+      <button id="tab-otp" onclick="setLoginMode('otp')">OTP</button>
+    </div>
+
+    <div class="field">
+      <label>Phone number</label>
+      <input type="text" id="login-phone" placeholder="+919900000001" />
+    </div>
+
+    <div id="pw-fields">
+      <div class="field">
+        <label>Password</label>
+        <input type="password" id="login-password" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()"/>
+      </div>
+      <button class="btn btn-primary" style="width:100%;justify-content:center" onclick="doLogin()">Log in</button>
+    </div>
+
+    <div id="otp-fields" style="display:none">
+      <div class="btn-row" style="margin-top:0">
+        <button class="btn btn-secondary btn-sm" onclick="requestOtp()">Send OTP</button>
+      </div>
+      <div class="field" style="margin-top:10px">
+        <label>6-digit code</label>
+        <input type="text" id="login-otp" placeholder="123456" onkeydown="if(event.key==='Enter')doOtpLogin()"/>
+      </div>
+      <button class="btn btn-primary" style="width:100%;justify-content:center" onclick="doOtpLogin()">Verify &amp; log in</button>
+    </div>
+
+    <div style="margin-top:18px;border-top:1px solid var(--border);padding-top:14px;">
+      <div class="small muted" style="cursor:pointer" onclick="toggleApiSettings()">⚙ API base: <code id="api-base-label" class="mono"></code></div>
+      <div id="api-settings" style="display:none;margin-top:8px;">
+        <input type="text" id="api-base-input" />
+        <button class="btn btn-secondary btn-sm" style="margin-top:6px" onclick="saveApiBase()">Save</button>
+      </div>
+    </div>
+
+    <div class="small muted" style="margin-top:16px;line-height:1.5;">
+      No account yet? The first Company + Admin user must be created via
+      Django Admin (<code class="mono">/admin/</code>) or <code class="mono">manage.py shell</code> —
+      there's no self-service company onboarding endpoint yet (documented gap in the backend README).
+    </div>
+  </div>
+</div>
+
+<!-- ===================== APP SHELL ===================== -->
+<div id="app" style="display:none">
+  <div id="sidebar">
+    <div class="brand">
+      <div class="mark"><span class="dot"></span><h1>GeoWork Pro</h1></div>
+      <div class="sub">Ops Console</div>
+    </div>
+    <div id="nav"></div>
+    <div class="foot">Modules 1–9 · V1.0 MVP</div>
+  </div>
+
+  <div id="main">
+    <div id="topbar">
+      <div class="page-title" id="page-title">Dashboard</div>
+      <div class="right">
+        <div class="api-chip" id="api-chip" onclick="toggleApiSettingsBar()">
+          <span class="dot"></span><span id="api-chip-label" class="mono"></span>
+        </div>
+        <div class="user-chip">
+          <div class="avatar" id="user-avatar">?</div>
+          <div class="who"><b id="user-name">—</b><span id="user-role">—</span></div>
+        </div>
+        <button class="btn-ghost-sm" onclick="doLogout()">Log out</button>
+      </div>
+    </div>
+    <div id="content"><div class="page"></div></div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
+<script>
+/* =====================================================================
+   GeoWork Pro — Ops Console
+   Single-file testing UI over the Django REST backend (Modules 1-9).
+   No build step: open this file directly, or serve it from any static
+   host. State lives in localStorage so a refresh doesn't log you out.
+===================================================================== */
+
+/* ---------------------------------------------------------------------
+   1. STATE + CONFIG
+--------------------------------------------------------------------- */
+const state = {
+  apiBase: localStorage.getItem('gw_api_base') || 'http://127.0.0.1:8000/api/v1',
+  access: localStorage.getItem('gw_access') || null,
+  refresh: localStorage.getItem('gw_refresh') || null,
+  user: JSON.parse(localStorage.getItem('gw_user') || 'null'),
+  loginMode: 'password',
+  route: 'dashboard',
+  // caches used across panels so selects don't re-fetch constantly
+  cache: { branches: [], departments: [], designations: [], shifts: [], employees: [] },
+};
+
+const ROLE_CHOICES = [['ADMIN','Admin'],['MANAGER','Manager'],['EMPLOYEE','Employee']];
+const CATEGORY_CHOICES = [['FACTORY','Factory'],['WAREHOUSE','Warehouse'],['OFFICE','Office'],['PARKING','Parking'],
+  ['ASSEMBLY_LINE','Assembly Line'],['BATTERY_ROOM','Battery Room'],['DISPATCH_AREA','Dispatch Area'],
+  ['CUSTOMER_SITE','Customer Site'],['OTHER','Other']];
+
+const NAV = [
+  {id:'dashboard', label:'Dashboard', icon:'&#9635;'},
+  {id:'organization', label:'Organization', icon:'&#127970;'},
+  {id:'employees', label:'Employees', icon:'&#128100;'},
+  {id:'geofence', label:'Geofence Builder', icon:'&#9673;'},
+  {id:'attendance', label:'Attendance', icon:'&#128337;'},
+  {id:'tracking', label:'Live Tracking', icon:'&#128225;'},
+  {id:'reports', label:'Reports', icon:'&#128202;'},
+  {id:'notifications', label:'Notifications', icon:'&#128276;'},
+];
+
+/* ---------------------------------------------------------------------
+   2. UTILITIES
+--------------------------------------------------------------------- */
+function $(sel, root){ return (root||document).querySelector(sel); }
+function $all(sel, root){ return Array.from((root||document).querySelectorAll(sel)); }
+function esc(s){ if(s===null||s===undefined) return ''; return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function fmtMinutes(total){ total = total||0; const h=Math.floor(total/60), m=total%60; return `${h}h ${m}m`; }
+function fmtDateTime(iso){ if(!iso) return '—'; try{ return new Date(iso).toLocaleString(); }catch(e){ return iso; } }
+function fmtTime(iso){ if(!iso) return '—'; try{ return new Date(iso).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}); }catch(e){ return iso; } }
+function todayStr(){ return new Date().toISOString().slice(0,10); }
+function toast(msg, kind){
+  const box = document.createElement('div');
+  box.className = 'toast' + (kind ? ' '+kind : '');
+  box.textContent = msg;
+  $('#toasts').appendChild(box);
+  setTimeout(()=>box.remove(), 4200);
+}
+function isPrivileged(){ return state.user && (state.user.role === 'ADMIN' || state.user.role === 'MANAGER'); }
+function isAdmin(){ return state.user && state.user.role === 'ADMIN'; }
+
+function formatApiError(body){
+  if (!body) return 'Something went wrong.';
+  if (typeof body === 'string') return body;
+  if (body.detail) return typeof body.detail === 'string' ? body.detail : JSON.stringify(body.detail);
+  const parts = [];
+  for (const key in body){
+    const val = body[key];
+    const msg = Array.isArray(val) ? val.join(' ') : (typeof val === 'object' ? JSON.stringify(val) : val);
+    parts.push(key === 'non_field_errors' ? msg : `${key}: ${msg}`);
+  }
+  return parts.length ? parts.join(' · ') : 'Request failed.';
+}
+
+/* ---------------------------------------------------------------------
+   3. API CLIENT (JWT-aware fetch wrapper with one-shot refresh retry)
+--------------------------------------------------------------------- */
+async function apiFetch(path, opts){
+  opts = opts || {};
+  const method = opts.method || 'GET';
+  const params = opts.params || null;
+  let url = state.apiBase.replace(/\/$/, '') + path;
+  if (params){
+    const qs = new URLSearchParams();
+    Object.entries(params).forEach(([k,v]) => { if (v !== undefined && v !== null && v !== '') qs.append(k, v); });
+    const qsStr = qs.toString();
+    if (qsStr) url += (url.includes('?') ? '&' : '?') + qsStr;
+  }
+  const headers = {};
+  if (!opts.raw) headers['Content-Type'] = 'application/json';
+  if (state.access) headers['Authorization'] = 'Bearer ' + state.access;
+
+  const doFetch = () => fetch(url, { method, headers, body: opts.body !== undefined ? (opts.raw ? opts.body : JSON.stringify(opts.body)) : undefined });
+
+  let res;
+  try {
+    res = await doFetch();
+  } catch (netErr) {
+    throw new Error(`Could not reach ${state.apiBase} — is the Django server running and is the API base URL correct?`);
+  }
+
+  if (res.status === 401 && state.refresh && !opts._retried){
+    const refreshed = await tryRefreshToken();
+    if (refreshed){
+      return apiFetch(path, Object.assign({}, opts, {_retried:true}));
+    }
+  }
+
+  if (opts.rawResponse) return res; // caller handles blob/status itself (file downloads)
+
+  if (res.status === 204) return null;
+  const text = await res.text();
+  let data = null;
+  try { data = text ? JSON.parse(text) : null; } catch(e) { data = text; }
+
+  if (!res.ok){
+    const err = new Error(formatApiError(data));
+    err.status = res.status;
+    err.body = data;
+    throw err;
+  }
+  return data;
+}
+
+async function tryRefreshToken(){
+  try{
+    const res = await fetch(state.apiBase.replace(/\/$/, '') + '/auth/token/refresh/', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ refresh: state.refresh })
+    });
+    if (!res.ok) { forceLogout(); return false; }
+    const data = await res.json();
+    state.access = data.access;
+    localStorage.setItem('gw_access', state.access);
+    if (data.refresh){ state.refresh = data.refresh; localStorage.setItem('gw_refresh', state.refresh); }
+    return true;
+  }catch(e){ return false; }
+}
+
+/* ---------------------------------------------------------------------
+   4. AUTH
+--------------------------------------------------------------------- */
+function setLoginMode(mode){
+  state.loginMode = mode;
+  $('#tab-pw').classList.toggle('active', mode==='password');
+  $('#tab-otp').classList.toggle('active', mode==='otp');
+  $('#pw-fields').style.display = mode==='password' ? '' : 'none';
+  $('#otp-fields').style.display = mode==='otp' ? '' : 'none';
+}
+
+function loginBanner(msg, kind){
+  $('#login-banner').innerHTML = msg ? `<div class="banner ${kind||'err'}">${esc(msg)}</div>` : '';
+}
+
+async function doLogin(){
+  const phone = $('#login-phone').value.trim();
+  const password = $('#login-password').value;
+  if (!phone || !password) return loginBanner('Phone and password are required.');
+  loginBanner('');
+  try{
+    const data = await apiFetch('/auth/login/', {method:'POST', body:{phone, password}});
+    onAuthed(data);
+  }catch(e){ loginBanner(e.message); }
+}
+
+async function requestOtp(){
+  const phone = $('#login-phone').value.trim();
+  if (!phone) return loginBanner('Enter a phone number first.');
+  loginBanner('');
+  try{
+    await apiFetch('/auth/login/otp/request/', {method:'POST', body:{phone}});
+    toast('OTP sent (check the Django server console — SMS delivery is stubbed in dev).', 'ok');
+  }catch(e){ loginBanner(e.message); }
+}
+
+async function doOtpLogin(){
+  const phone = $('#login-phone').value.trim();
+  const code = $('#login-otp').value.trim();
+  if (!phone || !code) return loginBanner('Phone and code are required.');
+  loginBanner('');
+  try{
+    const data = await apiFetch('/auth/login/otp/verify/', {method:'POST', body:{phone, code}});
+    onAuthed(data);
+  }catch(e){ loginBanner(e.message); }
+}
+
+function onAuthed(data){
+  state.access = data.access; state.refresh = data.refresh; state.user = data.user;
+  localStorage.setItem('gw_access', state.access);
+  localStorage.setItem('gw_refresh', state.refresh);
+  localStorage.setItem('gw_user', JSON.stringify(state.user));
+  showApp();
+}
+
+async function doLogout(){
+  try{ await apiFetch('/auth/logout/', {method:'POST', body:{refresh: state.refresh}}); }catch(e){}
+  forceLogout();
+}
+
+function forceLogout(){
+  state.access = null; state.refresh = null; state.user = null;
+  localStorage.removeItem('gw_access'); localStorage.removeItem('gw_refresh'); localStorage.removeItem('gw_user');
+  $('#app').style.display = 'none';
+  $('#login-screen').style.display = 'flex';
+}
+
+/* ---------------------------------------------------------------------
+   5. API BASE URL SETTINGS
+--------------------------------------------------------------------- */
+function toggleApiSettings(){
+  $('#api-base-input').value = state.apiBase;
+  const el = $('#api-settings');
+  el.style.display = el.style.display === 'none' ? '' : 'none';
+}
+function saveApiBase(){
+  const val = $('#api-base-input').value.trim().replace(/\/$/, '');
+  if (!val) return;
+  state.apiBase = val;
+  localStorage.setItem('gw_api_base', val);
+  refreshApiLabels();
+  toast('API base updated.', 'ok');
+  $('#api-settings').style.display = 'none';
+}
+function toggleApiSettingsBar(){
+  const existing = $('#api-settings-bar');
+  if (existing){ existing.remove(); return; }
+  const chip = $('#api-chip');
+  const pop = document.createElement('div');
+  pop.className = 'settings-pop'; pop.id = 'api-settings-bar';
+  const rect = chip.getBoundingClientRect();
+  pop.style.top = (rect.bottom + 8) + 'px';
+  pop.style.right = (window.innerWidth - rect.right) + 'px';
+  pop.innerHTML = `
+    <div class="field" style="margin-bottom:8px"><label>API base URL</label>
+    <input type="text" id="api-base-input-bar" value="${esc(state.apiBase)}"/></div>
+    <button class="btn btn-primary btn-sm" onclick="saveApiBaseBar()">Save &amp; recheck</button>`;
+  document.body.appendChild(pop);
+}
+function saveApiBaseBar(){
+  const val = $('#api-base-input-bar').value.trim().replace(/\/$/, '');
+  if (!val) return;
+  state.apiBase = val;
+  localStorage.setItem('gw_api_base', val);
+  refreshApiLabels();
+  $('#api-settings-bar').remove();
+  toast('API base updated.', 'ok');
+  checkApiHealth();
+}
+function refreshApiLabels(){
+  $('#api-base-label').textContent = state.apiBase;
+  $('#api-chip-label').textContent = state.apiBase.replace(/^https?:\/\//,'');
+}
+async function checkApiHealth(){
+  const chip = $('#api-chip');
+  try{
+    const res = await fetch(state.apiBase.replace(/\/$/, '') + '/dashboard/summary/', {headers: state.access ? {Authorization:'Bearer '+state.access}:{}});
+    chip.classList.remove('offline'); chip.classList.add('online');
+  }catch(e){
+    chip.classList.remove('online'); chip.classList.add('offline');
+  }
+}
+
+/* ---------------------------------------------------------------------
+   6. APP SHELL / ROUTER
+--------------------------------------------------------------------- */
+function showApp(){
+  $('#login-screen').style.display = 'none';
+  $('#app').style.display = 'flex';
+  refreshApiLabels();
+  checkApiHealth();
+  renderUserChip();
+  renderNav();
+  const initial = (location.hash || '#dashboard').replace('#','');
+  navigate(NAV.some(n=>n.id===initial) ? initial : 'dashboard');
+  refreshUnreadBadge();
+  setInterval(refreshUnreadBadge, 30000);
+}
+
+function renderUserChip(){
+  const u = state.user;
+  $('#user-avatar').textContent = (u.first_name||u.phone||'?').charAt(0).toUpperCase();
+  $('#user-name').textContent = u.full_name || `${u.first_name||''} ${u.last_name||''}`.trim() || u.phone;
+  $('#user-role').textContent = `${u.role}${u.company ? ' · Co #'+u.company : ''}`;
+}
+
+function renderNav(){
+  const nav = $('#nav');
+  nav.innerHTML = NAV.map(item => `
+    <div class="nav-item ${state.route===item.id?'active':''}" onclick="navigate('${item.id}')">
+      <span class="ic">${item.icon}</span><span>${item.label}</span>
+      ${item.id==='tracking' ? '<span class="pulse" id="tracking-pulse" style="display:none"></span>' : ''}
+      ${item.id==='notifications' ? '<span class="nav-badge" id="notif-badge" style="display:none">0</span>' : ''}
+    </div>`).join('');
+}
+
+function navigate(route){
+  state.route = route;
+  location.hash = route;
+  renderNav();
+  $('#page-title').textContent = NAV.find(n=>n.id===route).label;
+  const page = $('#content .page');
+  page.innerHTML = '<div class="muted">Loading…</div>';
+  const renderers = {
+    dashboard: renderDashboard, organization: renderOrganization, employees: renderEmployees,
+    geofence: renderGeofence, attendance: renderAttendance, tracking: renderTracking,
+    reports: renderReports, notifications: renderNotifications,
+  };
+  (renderers[route] || renderDashboard)();
+}
+window.addEventListener('hashchange', () => {
+  const r = location.hash.replace('#','');
+  if (r && r !== state.route && NAV.some(n=>n.id===r)) navigate(r);
+});
+
+async function refreshUnreadBadge(){
+  if (!state.access) return;
+  try{
+    const data = await apiFetch('/notifications/unread-count/');
+    const badge = $('#notif-badge');
+    if (badge){
+      if (data.unread_count > 0){ badge.style.display=''; badge.textContent = data.unread_count > 99 ? '99+' : data.unread_count; }
+      else badge.style.display = 'none';
+    }
+  }catch(e){ /* silent — badge just won't update */ }
+}
+
+/* =====================================================================
+   7. DASHBOARD  (Module 7)
+===================================================================== */
+async function renderDashboard(){
+  const page = $('#content .page');
+  await ensureBranches();
+  page.innerHTML = `
+    <div class="page-desc">Live rollup over Employees, Attendance, and Tracking. Manager/Admin only — a plain employee will see a 403 here (that's expected RBAC, not a bug).</div>
+    <div class="card">
+      <div class="form-row">
+        <div class="field"><label>Date</label><input type="date" id="dash-date" value="${todayStr()}"/></div>
+        <div class="field"><label>Branch</label><select id="dash-branch"><option value="">All branches</option>${branchOptions()}</select></div>
+        <button class="btn btn-primary" onclick="loadDashboard()">Refresh</button>
+      </div>
+    </div>
+    <div id="dash-tiles" style="margin-top:16px"></div>
+  `;
+  loadDashboard();
+}
+async function loadDashboard(){
+  const el = $('#dash-tiles');
+  el.innerHTML = '<div class="muted">Loading…</div>';
+  try{
+    const data = await apiFetch('/dashboard/summary/', {params:{date:$('#dash-date').value, branch:$('#dash-branch').value}});
+    el.innerHTML = `
+      <div class="tiles">
+        ${tile('t-total','Total Employees', data.total_employees)}
+        ${tile('t-present','Present', data.present)}
+        ${tile('t-absent','Absent', data.absent)}
+        ${tile('t-halfday','Half Day', data.half_day)}
+        ${tile('t-late','Late', data.late)}
+        ${tile('t-working','Working now', data.working)}
+        ${tile('t-outside','Outside Work Area', data.outside_work_area)}
+        ${tile('t-gps','GPS Disabled', data.gps_disabled)}
+        ${tile('t-jobs','Jobs Completed', data.jobs_completed===null?'—':data.jobs_completed)}
+        ${tile('t-jobs','Pending Jobs', data.pending_jobs===null?'—':data.pending_jobs)}
+      </div>
+      ${!data.jobs_module_available ? `<div class="banner info" style="margin-top:12px">Jobs tiles show — because Job Management is a V2.0 feature not built yet, per the roadmap.</div>` : ''}
+    `;
+  }catch(e){ el.innerHTML = `<div class="banner err">${esc(e.message)}</div>`; }
+}
+function tile(cls, label, num){
+  return `<div class="tile ${cls}"><div class="bar"></div><div class="num">${esc(num)}</div><div class="label">${esc(label)}</div></div>`;
+}
+
+/* =====================================================================
+   8. ORGANIZATION  (Module 2: Company / Branches / Departments / Designations / Shifts)
+===================================================================== */
+let orgTab = 'branches';
+async function renderOrganization(){
+  const page = $('#content .page');
+  page.innerHTML = `
+    <div class="page-desc">Company profile, branches, departments, designations, and shift timings. Reads work for any tenant user; writes require the Admin role (Manager gets a 403 — that's the backend's actual RBAC, surfaced here rather than hidden).</div>
+    <div class="card"><div class="card-head"><h3>Company Profile</h3></div><div id="org-company"></div></div>
+    <div class="card">
+      <div class="tabs">
+        <div class="tab ${orgTab==='branches'?'active':''}" onclick="setOrgTab('branches')">Branches</div>
+        <div class="tab ${orgTab==='departments'?'active':''}" onclick="setOrgTab('departments')">Departments</div>
+        <div class="tab ${orgTab==='designations'?'active':''}" onclick="setOrgTab('designations')">Designations</div>
+        <div class="tab ${orgTab==='shifts'?'active':''}" onclick="setOrgTab('shifts')">Shift Timings</div>
+      </div>
+      <div id="org-tab-content"></div>
+    </div>
+  `;
+  loadCompanyProfile();
+  await ensureBranches(true);
+  renderOrgTab();
+}
+function setOrgTab(tab){ orgTab = tab; renderOrganization(); }
+
+async function loadCompanyProfile(){
+  const el = $('#org-company');
+  try{
+    const data = await apiFetch('/company/companies/');
+    const co = (data.results || data)[0];
+    if (!co){ el.innerHTML = '<div class="muted">No company visible to this account.</div>'; return; }
+    el.innerHTML = `
+      <div class="grid grid-3">
+        <div class="field"><label>Name</label><input type="text" id="co-name" value="${esc(co.name)}" ${isAdmin()?'':'disabled'}/></div>
+        <div class="field"><label>Plan</label><input type="text" value="${esc(co.plan)}" disabled/></div>
+        <div class="field"><label>Timezone</label><input type="text" id="co-tz" value="${esc(co.timezone)}" ${isAdmin()?'':'disabled'}/></div>
+        <div class="field"><label>Contact email</label><input type="text" id="co-email" value="${esc(co.contact_email||'')}" ${isAdmin()?'':'disabled'}/></div>
+        <div class="field"><label>Contact phone</label><input type="text" id="co-phone" value="${esc(co.contact_phone||'')}" ${isAdmin()?'':'disabled'}/></div>
+        <div class="field"><label>Max employees</label><input type="text" value="${esc(co.max_employees)}" disabled/></div>
+      </div>
+      ${isAdmin() ? `<button class="btn btn-primary btn-sm" onclick="saveCompanyProfile(${co.id})">Save changes</button>` : `<div class="small muted">Admin role required to edit.</div>`}
+    `;
+  }catch(e){ el.innerHTML = `<div class="banner err">${esc(e.message)}</div>`; }
+}
+async function saveCompanyProfile(id){
+  try{
+    await apiFetch(`/company/companies/${id}/`, {method:'PATCH', body:{
+      name:$('#co-name').value, timezone:$('#co-tz').value, contact_email:$('#co-email').value, contact_phone:$('#co-phone').value,
+    }});
+    toast('Company profile updated.', 'ok');
+  }catch(e){ toast(e.message, 'err'); }
+}
+
+async function ensureBranches(force){
+  if (state.cache.branches.length && !force) return;
+  try{
+    const data = await apiFetch('/company/branches/', {params:{page_size:200}});
+    state.cache.branches = data.results || data;
+  }catch(e){ /* likely no company / not authorized — leave empty */ }
+}
+function branchOptions(selected){
+  return state.cache.branches.map(b => `<option value="${b.id}" ${String(b.id)===String(selected)?'selected':''}>${esc(b.name)}</option>`).join('');
+}
+
+async function renderOrgTab(){
+  const el = $('#org-tab-content');
+  el.innerHTML = '<div class="muted">Loading…</div>';
+  if (orgTab === 'branches') return renderBranchesTab(el);
+  if (orgTab === 'departments') return renderDepartmentsTab(el);
+  if (orgTab === 'designations') return renderDesignationsTab(el);
+  if (orgTab === 'shifts') return renderShiftsTab(el);
+}
+
+// -- Branches --
+async function renderBranchesTab(el){
+  try{
+    const data = await apiFetch('/company/branches/', {params:{page_size:200}});
+    const rows = data.results || data;
+    state.cache.branches = rows;
+    el.innerHTML = `
+      <div class="table-wrap"><table><thead><tr><th>Name</th><th>Code</th><th>City</th><th>State</th><th>Active</th><th></th></tr></thead>
+      <tbody>${rows.length ? rows.map(r=>`
+        <tr><td>${esc(r.name)}</td><td class="mono">${esc(r.code)}</td><td>${esc(r.city||'—')}</td><td>${esc(r.state||'—')}</td>
+        <td>${statusPill(r.is_active)}</td>
+        <td>${isAdmin()?`<button class="btn btn-secondary btn-sm" onclick='toggleActive("branches",${r.id},${!r.is_active})'>${r.is_active?'Disable':'Enable'}</button>`:''}</td></tr>
+      `).join('') : emptyRow(6,'No branches yet.')}</tbody></table></div>
+      ${isAdmin() ? branchForm() : ''}
+    `;
+  }catch(e){ el.innerHTML = `<div class="banner err">${esc(e.message)}</div>`; }
+}
+function branchForm(){
+  return `
+    <h4 style="margin-top:20px">Add branch</h4>
+    <div class="grid grid-3">
+      <div class="field"><label>Name <span class="req">*</span></label><input type="text" id="b-name"/></div>
+      <div class="field"><label>Code <span class="req">*</span></label><input type="text" id="b-code"/></div>
+      <div class="field"><label>City</label><input type="text" id="b-city"/></div>
+      <div class="field"><label>State</label><input type="text" id="b-state"/></div>
+      <div class="field"><label>Latitude</label><input type="text" id="b-lat" placeholder="18.5204"/></div>
+      <div class="field"><label>Longitude</label><input type="text" id="b-lng" placeholder="73.8567"/></div>
+    </div>
+    <div class="field"><label>Address</label><textarea id="b-address"></textarea></div>
+    <button class="btn btn-primary btn-sm" onclick="createBranch()">Add branch</button>
+  `;
+}
+async function createBranch(){
+  try{
+    await apiFetch('/company/branches/', {method:'POST', body:{
+      name:$('#b-name').value, code:$('#b-code').value, city:$('#b-city').value, state:$('#b-state').value,
+      address:$('#b-address').value, latitude:$('#b-lat').value||null, longitude:$('#b-lng').value||null,
+    }});
+    toast('Branch created.', 'ok'); await ensureBranches(true); renderOrgTab();
+  }catch(e){ toast(e.message, 'err'); }
+}
+
+// -- Departments --
+async function renderDepartmentsTab(el){
+  try{
+    const data = await apiFetch('/company/departments/', {params:{page_size:200}});
+    const rows = data.results || data;
+    el.innerHTML = `
+      <div class="table-wrap"><table><thead><tr><th>Name</th><th>Branch</th><th>Active</th><th></th></tr></thead>
+      <tbody>${rows.length ? rows.map(r=>`
+        <tr><td>${esc(r.name)}</td><td>${branchName(r.branch)}</td><td>${statusPill(r.is_active)}</td>
+        <td>${isAdmin()?`<button class="btn btn-secondary btn-sm" onclick='toggleActive("departments",${r.id},${!r.is_active})'>${r.is_active?'Disable':'Enable'}</button>`:''}</td></tr>
+      `).join('') : emptyRow(4,'No departments yet.')}</tbody></table></div>
+      ${isAdmin() ? `
+        <h4 style="margin-top:20px">Add department</h4>
+        <div class="form-row">
+          <div class="field"><label>Name <span class="req">*</span></label><input type="text" id="d-name"/></div>
+          <div class="field"><label>Branch</label><select id="d-branch"><option value="">—</option>${branchOptions()}</select></div>
+          <button class="btn btn-primary" onclick="createDepartment()">Add</button>
+        </div>` : ''}
+    `;
+  }catch(e){ el.innerHTML = `<div class="banner err">${esc(e.message)}</div>`; }
+}
+async function createDepartment(){
+  try{
+    await apiFetch('/company/departments/', {method:'POST', body:{name:$('#d-name').value, branch:$('#d-branch').value||null}});
+    toast('Department created.', 'ok'); renderOrgTab();
+  }catch(e){ toast(e.message, 'err'); }
+}
+
+// -- Designations --
+async function renderDesignationsTab(el){
+  try{
+    const deptData = await apiFetch('/company/departments/', {params:{page_size:200}});
+    const depts = deptData.results || deptData;
+    const data = await apiFetch('/company/designations/', {params:{page_size:200}});
+    const rows = data.results || data;
+    el.innerHTML = `
+      <div class="table-wrap"><table><thead><tr><th>Title</th><th>Department</th><th>Level</th><th>Active</th><th></th></tr></thead>
+      <tbody>${rows.length ? rows.map(r=>`
+        <tr><td>${esc(r.title)}</td><td>${depts.find(d=>d.id===r.department)?.name||'—'}</td><td>${r.level}</td><td>${statusPill(r.is_active)}</td>
+        <td>${isAdmin()?`<button class="btn btn-secondary btn-sm" onclick='toggleActive("designations",${r.id},${!r.is_active})'>${r.is_active?'Disable':'Enable'}</button>`:''}</td></tr>
+      `).join('') : emptyRow(5,'No designations yet.')}</tbody></table></div>
+      ${isAdmin() ? `
+        <h4 style="margin-top:20px">Add designation</h4>
+        <div class="form-row">
+          <div class="field"><label>Title <span class="req">*</span></label><input type="text" id="dg-title"/></div>
+          <div class="field"><label>Department</label><select id="dg-dept"><option value="">—</option>${depts.map(d=>`<option value="${d.id}">${esc(d.name)}</option>`).join('')}</select></div>
+          <div class="field"><label>Level</label><input type="number" id="dg-level" value="1" style="width:80px"/></div>
+          <button class="btn btn-primary" onclick="createDesignation()">Add</button>
+        </div>` : ''}
+    `;
+  }catch(e){ el.innerHTML = `<div class="banner err">${esc(e.message)}</div>`; }
+}
+async function createDesignation(){
+  try{
+    await apiFetch('/company/designations/', {method:'POST', body:{title:$('#dg-title').value, department:$('#dg-dept').value||null, level:Number($('#dg-level').value)||1}});
+    toast('Designation created.', 'ok'); renderOrgTab();
+  }catch(e){ toast(e.message, 'err'); }
+}
+
+// -- Shifts --
+async function renderShiftsTab(el){
+  try{
+    const data = await apiFetch('/company/shifts/', {params:{page_size:200}});
+    const rows = data.results || data;
+    state.cache.shifts = rows;
+    el.innerHTML = `
+      <div class="table-wrap"><table><thead><tr><th>Name</th><th>Start</th><th>End</th><th>Grace (min)</th><th>Half-day &lt;</th><th>Full day</th><th>Active</th><th></th></tr></thead>
+      <tbody>${rows.length ? rows.map(r=>`
+        <tr><td>${esc(r.name)}</td><td class="mono">${esc(r.start_time)}</td><td class="mono">${esc(r.end_time)}</td>
+        <td>${r.grace_period_minutes}</td><td>${fmtMinutes(r.half_day_after_minutes)}</td><td>${fmtMinutes(r.full_day_minutes)}</td>
+        <td>${statusPill(r.is_active)}</td>
+        <td>${isAdmin()?`<button class="btn btn-secondary btn-sm" onclick='toggleActive("shifts",${r.id},${!r.is_active})'>${r.is_active?'Disable':'Enable'}</button>`:''}</td></tr>
+      `).join('') : emptyRow(8,'No shifts yet.')}</tbody></table></div>
+      ${isAdmin() ? shiftForm() : ''}
+    `;
+  }catch(e){ el.innerHTML = `<div class="banner err">${esc(e.message)}</div>`; }
+}
+function shiftForm(){
+  return `
+    <h4 style="margin-top:20px">Add shift timing</h4>
+    <div class="grid grid-3">
+      <div class="field"><label>Name <span class="req">*</span></label><input type="text" id="s-name" placeholder="Day Shift"/></div>
+      <div class="field"><label>Branch</label><select id="s-branch"><option value="">—</option>${branchOptions()}</select></div>
+      <div class="field"><label>Start time <span class="req">*</span></label><input type="time" id="s-start" value="09:00"/></div>
+      <div class="field"><label>End time <span class="req">*</span></label><input type="time" id="s-end" value="18:00"/></div>
+      <div class="field"><label>Grace period (min)</label><input type="number" id="s-grace" value="10"/></div>
+      <div class="field"><label>Half-day under (min)</label><input type="number" id="s-half" value="240"/></div>
+      <div class="field"><label>Full day (min)</label><input type="number" id="s-full" value="480"/></div>
+      <div class="field"><label class="checkline"><input type="checkbox" id="s-night"/> Night shift (wraps past midnight)</label></div>
+    </div>
+    <button class="btn btn-primary btn-sm" onclick="createShift()">Add shift</button>
+  `;
+}
+async function createShift(){
+  try{
+    await apiFetch('/company/shifts/', {method:'POST', body:{
+      name:$('#s-name').value, branch:$('#s-branch').value||null, start_time:$('#s-start').value, end_time:$('#s-end').value,
+      grace_period_minutes:Number($('#s-grace').value)||0, half_day_after_minutes:Number($('#s-half').value)||240,
+      full_day_minutes:Number($('#s-full').value)||480, is_night_shift:$('#s-night').checked,
+    }});
+    toast('Shift created.', 'ok'); renderOrgTab();
+  }catch(e){ toast(e.message, 'err'); }
+}
+
+async function toggleActive(kind, id, newVal){
+  try{ await apiFetch(`/company/${kind}/${id}/`, {method:'PATCH', body:{is_active:newVal}}); renderOrgTab(); }
+  catch(e){ toast(e.message, 'err'); }
+}
+function statusPill(active){ return active ? `<span class="pill pill-green">ACTIVE</span>` : `<span class="pill pill-gray">DISABLED</span>`; }
+function branchName(id){ const b = state.cache.branches.find(x=>x.id===id); return b ? esc(b.name) : '—'; }
+function emptyRow(colspan, text){ return `<tr class="empty-row"><td colspan="${colspan}">${esc(text)}</td></tr>`; }
+
+/* =====================================================================
+   9. EMPLOYEES  (Module 3)
+===================================================================== */
+async function renderEmployees(){
+  const page = $('#content .page');
+  await ensureBranches();
+  page.innerHTML = `
+    <div class="page-desc">Reads work for any tenant user; create/edit/disable require Manager or Admin (an Employee account will get a 403 on writes — expected RBAC).</div>
+    <div class="card">
+      <div class="card-head"><h3>Employees</h3>${isPrivileged()?'<button class="btn btn-primary btn-sm" onclick="openEmployeeModal()">+ Add employee</button>':''}</div>
+      <div class="form-row" style="margin-bottom:14px">
+        <div class="field"><label>Status</label><select id="emp-filter-status"><option value="">All</option><option value="ACTIVE">Active</option><option value="DISABLED">Disabled</option></select></div>
+        <div class="field"><label>Branch</label><select id="emp-filter-branch"><option value="">All</option>${branchOptions()}</select></div>
+        <div class="field"><label>Search</label><input type="text" id="emp-filter-search" placeholder="Name, code, phone…"/></div>
+        <button class="btn btn-secondary" onclick="loadEmployees()">Filter</button>
+      </div>
+      <div id="emp-table"></div>
+    </div>
+  `;
+  loadEmployees();
+}
+async function loadEmployees(){
+  const el = $('#emp-table');
+  el.innerHTML = '<div class="muted">Loading…</div>';
+  try{
+    const data = await apiFetch('/employees/', {params:{
+      status:$('#emp-filter-status').value, branch:$('#emp-filter-branch').value, search:$('#emp-filter-search').value, page_size:200,
+    }});
+    const rows = data.results || data;
+    state.cache.employees = rows;
+    el.innerHTML = `
+      <div class="table-wrap"><table><thead><tr><th>Code</th><th>Name</th><th>Phone</th><th>Branch</th><th>Manager</th><th>Status</th><th></th></tr></thead>
+      <tbody>${rows.length ? rows.map(r=>`
+        <tr><td class="mono">${esc(r.employee_code)}</td><td>${esc(r.user.full_name)}<div class="small muted">${esc(r.user.role)}</div></td>
+        <td class="mono">${esc(r.user.phone)}</td><td>${branchName(r.branch)}</td><td>${esc(r.manager_name||'—')}</td>
+        <td>${r.status==='ACTIVE'?'<span class="pill pill-green">ACTIVE</span>':'<span class="pill pill-red">DISABLED</span>'}</td>
+        <td>${isPrivileged()?`<button class="btn btn-secondary btn-sm" onclick="openEmployeeModal(${r.id})">Edit</button>
+          <button class="btn btn-secondary btn-sm" onclick='setEmployeeStatus(${r.id},"${r.status==='ACTIVE'?'disable':'enable'}")'>${r.status==='ACTIVE'?'Disable':'Enable'}</button>`:''}</td></tr>
+      `).join('') : emptyRow(7,'No employees match this filter.')}</tbody></table></div>
+    `;
+  }catch(e){ el.innerHTML = `<div class="banner err">${esc(e.message)}</div>`; }
+}
+async function setEmployeeStatus(id, action){
+  try{ await apiFetch(`/employees/${id}/status/`, {method:'POST', body:{action}}); toast(`Employee ${action}d.`, 'ok'); loadEmployees(); }
+  catch(e){ toast(e.message, 'err'); }
+}
+function openEmployeeModal(id){
+  const existing = id ? state.cache.employees.find(e=>e.id===id) : null;
+  const depts = state.cache.departments || [];
+  const modal = document.createElement('div');
+  modal.className = 'modal-backdrop';
+  modal.onclick = (ev) => { if (ev.target === modal) modal.remove(); };
+  modal.innerHTML = `
+    <div class="modal">
+      <div class="modal-head"><h3>${existing?'Edit employee':'Add employee'}</h3><button class="x-close" onclick="this.closest('.modal-backdrop').remove()">&times;</button></div>
+      ${!existing ? `
+        <div class="grid grid-2">
+          <div class="field"><label>Phone <span class="req">*</span></label><input type="text" id="em-phone" placeholder="+919900000001"/></div>
+          <div class="field"><label>Password <span class="req">*</span></label><input type="password" id="em-password"/></div>
+          <div class="field"><label>First name <span class="req">*</span></label><input type="text" id="em-first"/></div>
+          <div class="field"><label>Last name</label><input type="text" id="em-last"/></div>
+          <div class="field"><label>Email</label><input type="text" id="em-email"/></div>
+          <div class="field"><label>Role</label><select id="em-role">${ROLE_CHOICES.filter(r=>r[0]!=='ADMIN').map(r=>`<option value="${r[0]}">${r[1]}</option>`).join('')}</select></div>
+        </div>` : `<div class="small muted" style="margin-bottom:10px">Login/role fields aren't editable here — only org-structure and HR fields.</div>`}
+      <div class="grid grid-2">
+        <div class="field"><label>Employee code <span class="req">*</span></label><input type="text" id="em-code" value="${existing?esc(existing.employee_code):''}" ${existing?'disabled':''}/></div>
+        <div class="field"><label>Branch</label><select id="em-branch"><option value="">—</option>${branchOptions(existing?.branch)}</select></div>
+        <div class="field"><label>Department</label><select id="em-dept"><option value="">—</option>${depts.map(d=>`<option value="${d.id}" ${existing?.department===d.id?'selected':''}>${esc(d.name)}</option>`).join('')}</select></div>
+        <div class="field"><label>Designation</label><select id="em-desig"><option value="">—</option>${(state.cache.designations||[]).map(d=>`<option value="${d.id}" ${existing?.designation===d.id?'selected':''}>${esc(d.title)}</option>`).join('')}</select></div>
+        <div class="field"><label>Shift</label><select id="em-shift"><option value="">—</option>${(state.cache.shifts||[]).map(s=>`<option value="${s.id}" ${existing?.shift===s.id?'selected':''}>${esc(s.name)}</option>`).join('')}</select></div>
+        <div class="field"><label>Manager (employee id)</label><input type="number" id="em-manager" value="${existing?.manager||''}" placeholder="optional"/></div>
+        <div class="field"><label>Date of joining</label><input type="date" id="em-doj" value="${existing?.date_of_joining||''}"/></div>
+      </div>
+      <div class="field"><label>Address</label><textarea id="em-address">${existing?esc(existing.address||''):''}</textarea></div>
+      <div class="btn-row"><button class="btn btn-primary" onclick="submitEmployee(${existing?existing.id:'null'})">${existing?'Save changes':'Create employee'}</button></div>
+    </div>`;
+  document.body.appendChild(modal);
+  if (!state.cache.departments || !state.cache.departments.length){
+    apiFetch('/company/departments/', {params:{page_size:200}}).then(d=>{ state.cache.departments = d.results||d; }).catch(()=>{});
+  }
+  if (!state.cache.designations || !state.cache.designations.length){
+    apiFetch('/company/designations/', {params:{page_size:200}}).then(d=>{ state.cache.designations = d.results||d; }).catch(()=>{});
+  }
+  if (!state.cache.shifts){
+    apiFetch('/company/shifts/', {params:{page_size:200}}).then(d=>{ state.cache.shifts = d.results||d; }).catch(()=>{});
+  }
+}
+async function submitEmployee(id){
+  const body = {
+    branch: $('#em-branch').value || null, department: $('#em-dept').value || null,
+    designation: $('#em-desig').value || null,
+    shift: $('#em-shift').value || null, manager: $('#em-manager').value || null,
+    date_of_joining: $('#em-doj').value || null, address: $('#em-address').value,
+  };
+  try{
+    if (id){
+      await apiFetch(`/employees/${id}/`, {method:'PATCH', body});
+      toast('Employee updated.', 'ok');
+    } else {
+      body.phone = $('#em-phone').value; body.password = $('#em-password').value;
+      body.first_name = $('#em-first').value; body.last_name = $('#em-last').value;
+      body.email = $('#em-email').value || null; body.role = $('#em-role').value;
+      body.employee_code = $('#em-code').value;
+      await apiFetch('/employees/', {method:'POST', body});
+      toast('Employee created.', 'ok');
+    }
+    $('.modal-backdrop').remove();
+    loadEmployees();
+  }catch(e){ toast(e.message, 'err'); }
+}
+
+/* =====================================================================
+   10. GEOFENCE BUILDER  (Module 4) — Leaflet + Leaflet.draw
+===================================================================== */
+let geoMap, geoDrawnLayer, geoStaticLayerGroup, geoTestMarker, geoWorkAreas = [];
+async function renderGeofence(){
+  const page = $('#content .page');
+  await ensureBranches();
+  page.innerHTML = `
+    <div class="page-desc">Draw a polygon, circle, or rectangle and save it as a work area. Existing areas for the selected branch render on the map. Click "Test a point" then click the map to run the same containment check Attendance/Tracking use.</div>
+    <div class="grid grid-2" style="grid-template-columns: 2fr 1fr;">
+      <div>
+        <div class="card">
+          <div class="form-row" style="margin-bottom:12px">
+            <div class="field"><label>Branch <span class="req">*</span></label><select id="geo-branch" onchange="loadWorkAreasForBranch()">${branchOptions()}</select></div>
+            <button class="btn btn-secondary btn-sm" id="geo-test-btn" onclick="toggleTestMode()">Test a point</button>
+          </div>
+          <div id="geo-map"></div>
+          <div class="legend">
+            <span><span class="swatch" style="background:#2E86DE"></span> Draw a shape with the toolbar (top-left of map) to create a work area</span>
+          </div>
+          <div id="geo-test-result"></div>
+        </div>
+      </div>
+      <div>
+        <div class="card"><div class="card-head"><h3>Work areas</h3></div><div id="geo-list"></div></div>
+      </div>
+    </div>
+  `;
+  initGeoMap();
+  loadWorkAreasForBranch();
+}
+function initGeoMap(){
+  geoMap = L.map('geo-map').setView([18.5204, 73.8567], 13);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; OpenStreetMap contributors', maxZoom: 19,
+  }).addTo(geoMap);
+
+  geoDrawnLayer = new L.FeatureGroup();
+  geoMap.addLayer(geoDrawnLayer);
+  geoStaticLayerGroup = new L.FeatureGroup();
+  geoMap.addLayer(geoStaticLayerGroup);
+
+  const drawControl = new L.Control.Draw({
+    edit: { featureGroup: geoDrawnLayer, remove: false },
+    draw: {
+      polygon: { allowIntersection:false, showArea:true, shapeOptions:{color:'#0D9488'} },
+      circle: { shapeOptions:{color:'#0D9488'} },
+      rectangle: { shapeOptions:{color:'#0D9488'} },
+      marker: false, circlemarker: false, polyline: false,
+    }
+  });
+  geoMap.addControl(drawControl);
+
+  geoMap.on(L.Draw.Event.CREATED, (e) => {
+    geoDrawnLayer.clearLayers();
+    geoDrawnLayer.addLayer(e.layer);
+    openWorkAreaSaveForm(e.layerType, e.layer);
+  });
+
+  geoMap.on('click', (e) => {
+    if (!state.geoTestMode) return;
+    if (geoTestMarker) geoMap.removeLayer(geoTestMarker);
+    geoTestMarker = L.marker(e.latlng).addTo(geoMap);
+    runPointCheck(e.latlng.lat, e.latlng.lng);
+  });
+}
+function toggleTestMode(){
+  state.geoTestMode = !state.geoTestMode;
+  $('#geo-test-btn').classList.toggle('btn-primary', state.geoTestMode);
+  $('#geo-test-btn').textContent = state.geoTestMode ? 'Testing… click the map' : 'Test a point';
+  if (!state.geoTestMode) $('#geo-test-result').innerHTML = '';
+}
+async function runPointCheck(lat, lng){
+  const el = $('#geo-test-result');
+  el.innerHTML = '<div class="muted" style="margin-top:10px">Checking…</div>';
+  try{
+    const data = await apiFetch('/geofence/work-areas/check-point/', {method:'POST', body:{
+      latitude: lat, longitude: lng, branch: $('#geo-branch').value || undefined,
+    }});
+    el.innerHTML = data.inside_any_work_area
+      ? `<div class="banner ok" style="margin-top:10px">Inside: ${data.matches.map(m=>esc(m.name)).join(', ')}</div>`
+      : `<div class="banner info" style="margin-top:10px">Outside every active work area for this branch.</div>`;
+  }catch(e){ el.innerHTML = `<div class="banner err" style="margin-top:10px">${esc(e.message)}</div>`; }
+}
+function openWorkAreaSaveForm(layerType, layer){
+  const modal = document.createElement('div');
+  modal.className = 'modal-backdrop';
+  modal.innerHTML = `
+    <div class="modal" style="max-width:420px">
+      <div class="modal-head"><h3>Save work area</h3><button class="x-close" onclick="this.closest('.modal-backdrop').remove()">&times;</button></div>
+      <div class="field"><label>Name <span class="req">*</span></label><input type="text" id="wa-name"/></div>
+      <div class="grid grid-2">
+        <div class="field"><label>Category</label><select id="wa-category">${CATEGORY_CHOICES.map(c=>`<option value="${c[0]}">${c[1]}</option>`).join('')}</select></div>
+        <div class="field"><label>Color</label><input type="color" id="wa-color" value="#2E86DE"/></div>
+      </div>
+      <div class="small muted">Shape: ${esc(layerType)} · Branch: ${branchName(Number($('#geo-branch').value))}</div>
+      <div class="btn-row"><button class="btn btn-primary" onclick="saveWorkArea('${layerType}')">Save</button></div>
+    </div>`;
+  document.body.appendChild(modal);
+}
+async function saveWorkArea(layerType){
+  const layer = geoDrawnLayer.getLayers()[0];
+  const branch = $('#geo-branch').value;
+  const name = $('#wa-name').value.trim();
+  if (!branch) return toast('Select a branch first.', 'err');
+  if (!name) return toast('Name is required.', 'err');
+
+  let shape_type, payload = {};
+  if (layerType === 'polygon'){
+    shape_type = 'POLYGON';
+    const latlngs = layer.getLatLngs()[0];
+    payload.points = latlngs.map(p => ({latitude: p.lat, longitude: p.lng}));
+  } else if (layerType === 'rectangle'){
+    shape_type = 'RECTANGLE';
+    const b = layer.getBounds();
+    payload.bounds = { south_west: {latitude:b.getSouth(), longitude:b.getWest()}, north_east: {latitude:b.getNorth(), longitude:b.getEast()} };
+  } else if (layerType === 'circle'){
+    shape_type = 'CIRCLE';
+    const c = layer.getLatLng();
+    payload.center = {latitude:c.lat, longitude:c.lng};
+    payload.radius_meters = layer.getRadius();
+  } else {
+    return toast('Unsupported shape — use polygon, rectangle, or circle.', 'err');
+  }
+
+  try{
+    await apiFetch('/geofence/work-areas/', {method:'POST', body:Object.assign({
+      branch, name, category:$('#wa-category').value, color:$('#wa-color').value, shape_type,
+    }, payload)});
+    toast('Work area saved.', 'ok');
+    document.querySelector('.modal-backdrop').remove();
+    geoDrawnLayer.clearLayers();
+    loadWorkAreasForBranch();
+  }catch(e){ toast(e.message, 'err'); }
+}
+async function loadWorkAreasForBranch(){
+  const branch = $('#geo-branch') ? $('#geo-branch').value : '';
+  geoStaticLayerGroup.clearLayers();
+  const listEl = $('#geo-list');
+  if (!branch){ if(listEl) listEl.innerHTML = '<div class="muted">Select a branch.</div>'; return; }
+  if (listEl) listEl.innerHTML = '<div class="muted">Loading…</div>';
+  try{
+    const data = await apiFetch('/geofence/work-areas/', {params:{branch, page_size:200}});
+    geoWorkAreas = data.results || data;
+    geoWorkAreas.forEach(wa => {
+      const latlngs = wa.boundary_points.map(p => [p.latitude, p.longitude]);
+      const poly = L.polygon(latlngs, {color: wa.color, weight:2, fillOpacity:0.15}).addTo(geoStaticLayerGroup);
+      poly.bindTooltip(`${wa.name} (${wa.shape_type})`);
+    });
+    if (geoWorkAreas.length){
+      const group = new L.FeatureGroup(geoStaticLayerGroup.getLayers());
+      geoMap.fitBounds(group.getBounds().pad(0.2));
+    }
+    if (listEl) listEl.innerHTML = geoWorkAreas.length ? geoWorkAreas.map(wa => `
+      <div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid #EFF1F4">
+        <span class="swatch" style="background:${esc(wa.color)}"></span>
+        <div style="flex:1"><b style="font-size:12.5px">${esc(wa.name)}</b><div class="small muted">${esc(wa.shape_type)} · ${esc(wa.category)}</div></div>
+        ${wa.is_active ? '<span class="pill pill-green">ACTIVE</span>' : '<span class="pill pill-gray">OFF</span>'}
+        ${isAdmin() ? `<button class="btn btn-secondary btn-sm" onclick="deleteWorkArea(${wa.id})">Delete</button>` : ''}
+      </div>
+    `).join('') : '<div class="muted">No work areas for this branch yet — draw one on the map.</div>';
+  }catch(e){ if(listEl) listEl.innerHTML = `<div class="banner err">${esc(e.message)}</div>`; }
+}
+async function deleteWorkArea(id){
+  if (!confirm('Delete this work area? This cannot be undone.')) return;
+  try{ await apiFetch(`/geofence/work-areas/${id}/`, {method:'DELETE'}); toast('Deleted.', 'ok'); loadWorkAreasForBranch(); }
+  catch(e){ toast(e.message, 'err'); }
+}
+
+/* =====================================================================
+   11. ATTENDANCE  (Module 5)
+===================================================================== */
+async function renderAttendance(){
+  const page = $('#content .page');
+  await ensureBranches();
+  page.innerHTML = `
+    <div class="page-desc">"My Attendance" acts on your own login (works for any role with an employee profile — Admin/Manager accounts created via the shell often don't have one, and will see a friendly 404 here, not a crash). Team Records below is visible to everyone but auto-scoped to your own row if you're a plain employee.</div>
+    <div class="grid grid-2">
+      <div class="card">
+        <div class="card-head"><h3>My Attendance — Today</h3></div>
+        <div id="att-today"></div>
+      </div>
+      <div class="card">
+        <div class="card-head"><h3>Test Location <span class="hint">used by Start/End Shift below</span></h3></div>
+        <div class="form-row">
+          <div class="field"><label>Latitude</label><input type="text" id="att-lat" placeholder="18.5204"/></div>
+          <div class="field"><label>Longitude</label><input type="text" id="att-lng" placeholder="73.8567"/></div>
+        </div>
+        <button class="btn btn-secondary btn-sm" onclick="useMyLocation('att-lat','att-lng')">Use my device location</button>
+        <div class="small muted" style="margin-top:8px">Tip: enter coordinates inside a work area you drew in Geofence Builder to test a successful check-in — real GPS usually won't be near a test geofence.</div>
+        <div class="btn-row">
+          <button class="btn btn-primary" onclick="doStartShift()">Start Shift</button>
+          <button class="btn btn-primary" onclick="doEndShift()">End Shift</button>
+        </div>
+        <div id="att-action-result"></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-head"><h3>Attendance Records</h3></div>
+      <div class="form-row" style="margin-bottom:12px">
+        <div class="field"><label>Date</label><input type="date" id="att-filter-date"/></div>
+        <div class="field"><label>Branch</label><select id="att-filter-branch"><option value="">All</option>${branchOptions()}</select></div>
+        <div class="field"><label>Status</label><select id="att-filter-status"><option value="">All</option><option value="PRESENT">Present</option><option value="HALF_DAY">Half Day</option><option value="ABSENT">Absent</option></select></div>
+        <div class="field"><label>Late only</label><select id="att-filter-late"><option value="">—</option><option value="true">Yes</option></select></div>
+        <button class="btn btn-secondary" onclick="loadAttendanceRecords()">Filter</button>
+      </div>
+      <div id="att-records"></div>
+    </div>
+  `;
+  loadTodayAttendance();
+  loadAttendanceRecords();
+}
+function useMyLocation(latId, lngId){
+  if (!navigator.geolocation) return toast('Geolocation not supported by this browser.', 'err');
+  navigator.geolocation.getCurrentPosition(
+    pos => { $('#'+latId).value = pos.coords.latitude.toFixed(6); $('#'+lngId).value = pos.coords.longitude.toFixed(6); },
+    err => toast('Could not get location: ' + err.message, 'err')
+  );
+}
+async function loadTodayAttendance(){
+  const el = $('#att-today');
+  try{
+    const r = await apiFetch('/attendance/today/');
+    el.innerHTML = attendanceRecordCard(r);
+  }catch(e){
+    el.innerHTML = e.status === 404
+      ? '<div class="banner info">This account has no employee profile — attendance actions don\'t apply (typical for a shell-created Admin).</div>'
+      : `<div class="banner err">${esc(e.message)}</div>`;
+  }
+}
+function attendanceRecordCard(r){
+  const statusPillMap = {PRESENT:'pill-green', HALF_DAY:'pill-amber', ABSENT:'pill-red'};
+  return `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <span class="pill ${statusPillMap[r.status]||'pill-gray'}">${esc(r.status)}</span>
+      ${r.is_late ? `<span class="pill pill-amber">LATE by ${r.late_by_minutes}m</span>` : ''}
+      ${r.is_early_exit ? `<span class="pill pill-amber">EARLY EXIT by ${r.early_exit_by_minutes}m</span>` : ''}
+    </div>
+    <table><tbody>
+      <tr><td class="muted">Check in</td><td>${fmtDateTime(r.check_in_time)} ${r.check_in_work_area_name?`<span class="small muted">(${esc(r.check_in_work_area_name)})</span>`:''}</td></tr>
+      <tr><td class="muted">Check out</td><td>${fmtDateTime(r.check_out_time)} ${r.check_out_work_area_name?`<span class="small muted">(${esc(r.check_out_work_area_name)})</span>`:''}</td></tr>
+      <tr><td class="muted">Working hours</td><td>${esc(r.working_hours)}</td></tr>
+      <tr><td class="muted">Source</td><td>${esc(r.check_in_source)}</td></tr>
+    </tbody></table>
+  `;
+}
+async function doStartShift(){
+  const lat = $('#att-lat').value, lng = $('#att-lng').value;
+  if (!lat || !lng) return toast('Enter latitude/longitude first.', 'err');
+  try{
+    const r = await apiFetch('/attendance/start-shift/', {method:'POST', body:{latitude:Number(lat), longitude:Number(lng)}});
+    $('#att-action-result').innerHTML = `<div class="banner ok" style="margin-top:12px">Checked in. Status: ${esc(r.status)}${r.is_late?` (late by ${r.late_by_minutes}m)`:''}</div>`;
+    loadTodayAttendance(); loadAttendanceRecords();
+  }catch(e){ $('#att-action-result').innerHTML = `<div class="banner err" style="margin-top:12px">${esc(e.message)}</div>`; }
+}
+async function doEndShift(){
+  const lat = $('#att-lat').value, lng = $('#att-lng').value;
+  if (!lat || !lng) return toast('Enter latitude/longitude first.', 'err');
+  try{
+    const r = await apiFetch('/attendance/end-shift/', {method:'POST', body:{latitude:Number(lat), longitude:Number(lng)}});
+    $('#att-action-result').innerHTML = `<div class="banner ok" style="margin-top:12px">Checked out. Worked ${esc(r.working_hours)} · Status: ${esc(r.status)}</div>`;
+    loadTodayAttendance(); loadAttendanceRecords();
+  }catch(e){ $('#att-action-result').innerHTML = `<div class="banner err" style="margin-top:12px">${esc(e.message)}</div>`; }
+}
+async function loadAttendanceRecords(){
+  const el = $('#att-records');
+  el.innerHTML = '<div class="muted">Loading…</div>';
+  try{
+    const data = await apiFetch('/attendance/records/', {params:{
+      date:$('#att-filter-date').value, branch:$('#att-filter-branch').value,
+      status:$('#att-filter-status').value, is_late:$('#att-filter-late').value, page_size:100,
+    }});
+    const rows = data.results || data;
+    const statusPillMap = {PRESENT:'pill-green', HALF_DAY:'pill-amber', ABSENT:'pill-red'};
+    el.innerHTML = `<div class="table-wrap"><table><thead><tr><th>Date</th><th>Employee</th><th>Status</th><th>Check In</th><th>Check Out</th><th>Late</th><th>Working Hours</th><th>Source</th></tr></thead>
+      <tbody>${rows.length ? rows.map(r=>`
+        <tr><td>${esc(r.date)}</td><td>${esc(r.employee_name)} <span class="small muted mono">${esc(r.employee_code)}</span></td>
+        <td><span class="pill ${statusPillMap[r.status]||'pill-gray'}">${esc(r.status)}</span></td>
+        <td>${fmtTime(r.check_in_time)}</td><td>${fmtTime(r.check_out_time)}</td>
+        <td>${r.is_late?`+${r.late_by_minutes}m`:'—'}</td><td>${esc(r.working_hours)}</td><td class="small">${esc(r.check_in_source)}</td></tr>
+      `).join('') : emptyRow(8,'No records match this filter.')}</tbody></table></div>`;
+  }catch(e){ el.innerHTML = `<div class="banner err">${esc(e.message)}</div>`; }
+}
+
+/* =====================================================================
+   12. LIVE TRACKING  (Module 6)
+===================================================================== */
+async function renderTracking(){
+  const page = $('#content .page');
+  page.innerHTML = `
+    <div class="page-desc">Send a test ping to simulate the mobile app's background location report — it drives the live dashboard below AND auto-fires Attendance check-in/out on a work-area transition (watch the result panel).</div>
+    <div class="card">
+      <div class="card-head"><h3>Send Test Ping</h3></div>
+      <div class="form-row">
+        <div class="field"><label>Latitude</label><input type="text" id="ping-lat"/></div>
+        <div class="field"><label>Longitude</label><input type="text" id="ping-lng"/></div>
+        <div class="field"><label>Accuracy (m)</label><input type="number" id="ping-acc" value="8"/></div>
+        <div class="field"><label>Battery %</label><input type="number" id="ping-batt" value="80"/></div>
+      </div>
+      <div class="form-row">
+        <label class="checkline"><input type="checkbox" id="ping-gps" checked/> GPS enabled</label>
+        <label class="checkline"><input type="checkbox" id="ping-net" checked/> Network connected</label>
+        <button class="btn btn-secondary btn-sm" onclick="useMyLocation('ping-lat','ping-lng')">Use my device location</button>
+      </div>
+      <div class="btn-row"><button class="btn btn-primary" onclick="sendPing()">Send Ping</button></div>
+      <div id="ping-result"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h3>Live Dashboard <span class="hint">Manager/Admin only</span></h3>
+        <button class="btn btn-secondary btn-sm" onclick="loadLiveDashboard()">Refresh</button></div>
+      <div id="live-table"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h3>Ping History</h3></div>
+      <div class="form-row" style="margin-bottom:12px">
+        <div class="field"><label>Employee id</label><input type="number" id="ping-hist-emp" placeholder="optional"/></div>
+        <button class="btn btn-secondary" onclick="loadPingHistory()">Load</button>
+      </div>
+      <div id="ping-history"></div>
+    </div>
+  `;
+  loadLiveDashboard();
+  loadPingHistory();
+}
+async function sendPing(){
+  const lat = $('#ping-lat').value, lng = $('#ping-lng').value;
+  if (!lat || !lng) return toast('Enter latitude/longitude first.', 'err');
+  try{
+    const r = await apiFetch('/tracking/ping/', {method:'POST', body:{
+      latitude:Number(lat), longitude:Number(lng), accuracy_meters:Number($('#ping-acc').value)||null,
+      battery_level:Number($('#ping-batt').value)||null, gps_enabled:$('#ping-gps').checked, network_connected:$('#ping-net').checked,
+    }});
+    const ls = r.live_status;
+    let html = `<div class="banner ok" style="margin-top:12px">
+      Live status updated · ${statusToPill(ls.connectivity_status)} · Work area: ${esc(ls.current_work_area_name||'none')} · Shift: ${esc(ls.shift_status)}</div>`;
+    if (r.attendance_update){
+      html += `<div class="banner info">Attendance auto-updated by this ping → status ${esc(r.attendance_update.status)}, source ${esc(r.attendance_update.check_in_source)}. Check the Notifications tab — this should have fired a push too.</div>`;
+    }
+    $('#ping-result').innerHTML = html;
+    loadLiveDashboard(); loadPingHistory();
+  }catch(e){ $('#ping-result').innerHTML = `<div class="banner err" style="margin-top:12px">${esc(e.message)}</div>`; }
+}
+function statusToPill(status){
+  const map = {ONLINE:'pill-green', OFFLINE:'pill-gray', GPS_DISABLED:'pill-violet', INTERNET_DISCONNECTED:'pill-red'};
+  return `<span class="pill ${map[status]||'pill-gray'}">${esc(status)}</span>`;
+}
+async function loadLiveDashboard(){
+  const el = $('#live-table');
+  el.innerHTML = '<div class="muted">Loading…</div>';
+  try{
+    const data = await apiFetch('/tracking/live/', {params:{page_size:200}});
+    const rows = data.results || data;
+    const anyOnline = rows.some(r => r.is_online);
+    const pulse = $('#tracking-pulse'); if (pulse) pulse.style.display = anyOnline ? '' : 'none';
+    el.innerHTML = `<div class="table-wrap"><table><thead><tr><th>Employee</th><th>Branch</th><th>Connectivity</th><th>Work Area</th><th>Shift</th><th>Last Ping</th></tr></thead>
+      <tbody>${rows.length ? rows.map(r=>`
+        <tr><td>${esc(r.employee_name)} <span class="small muted mono">${esc(r.employee_code)}</span></td>
+        <td>${esc(r.branch_name||'—')}</td><td>${statusToPill(r.connectivity_status)}</td>
+        <td>${esc(r.current_work_area_name||'—')}</td><td><span class="pill pill-blue">${esc(r.shift_status)}</span></td>
+        <td>${fmtDateTime(r.last_ping_at)}</td></tr>
+      `).join('') : emptyRow(6,'No live status yet — send a test ping.')}</tbody></table></div>`;
+  }catch(e){
+    el.innerHTML = e.status === 403
+      ? '<div class="banner info">403 — Manager/Admin role required. This is correct RBAC, try again on a Manager/Admin account to see this table.</div>'
+      : `<div class="banner err">${esc(e.message)}</div>`;
+  }
+}
+async function loadPingHistory(){
+  const el = $('#ping-history');
+  el.innerHTML = '<div class="muted">Loading…</div>';
+  try{
+    const data = await apiFetch('/tracking/pings/', {params:{employee:$('#ping-hist-emp')?.value, page_size:50}});
+    const rows = data.results || data;
+    el.innerHTML = `<div class="table-wrap"><table><thead><tr><th>Recorded</th><th>Employee</th><th>Lat</th><th>Lng</th><th>Work Area</th><th>GPS</th><th>Network</th></tr></thead>
+      <tbody>${rows.length ? rows.map(r=>`
+        <tr><td>${fmtDateTime(r.recorded_at)}</td><td class="small">#${r.employee}</td>
+        <td class="mono">${r.latitude.toFixed(5)}</td><td class="mono">${r.longitude.toFixed(5)}</td>
+        <td>${esc(r.work_area_name||'—')}</td><td>${r.gps_enabled?'✅':'❌'}</td><td>${r.network_connected?'✅':'❌'}</td></tr>
+      `).join('') : emptyRow(7,'No pings recorded yet.')}</tbody></table></div>`;
+  }catch(e){ el.innerHTML = `<div class="banner err">${esc(e.message)}</div>`; }
+}
+
+/* =====================================================================
+   13. REPORTS  (Module 8)
+===================================================================== */
+const REPORT_TYPES = [
+  {id:'daily-attendance', label:'Daily Attendance', fields:['date']},
+  {id:'monthly-attendance', label:'Monthly Attendance', fields:['year','month']},
+  {id:'working-hours', label:'Working Hours', fields:['date_from','date_to']},
+  {id:'late', label:'Late Arrivals', fields:['date_from','date_to']},
+  {id:'overtime', label:'Overtime', fields:['date_from','date_to']},
+  {id:'attendance-percentage', label:'Attendance Percentage', fields:['date_from','date_to']},
+];
+let reportType = 'daily-attendance';
+async function renderReports(){
+  const page = $('#content .page');
+  await ensureBranches();
+  page.innerHTML = `
+    <div class="page-desc">Same RBAC as Attendance — a plain employee always sees only their own row, regardless of the Employee filter below. Excel/PDF downloads use <code class="mono">?export=</code>, deliberately not <code class="mono">?format=</code> (that's a reserved DRF param — using it silently 404s, a real bug caught and documented during backend testing).</div>
+    <div class="card">
+      <div class="field"><label>Report type</label><select id="rep-type" onchange="onReportTypeChange()">${REPORT_TYPES.map(r=>`<option value="${r.id}">${r.label}</option>`).join('')}</select></div>
+      <div id="rep-fields" class="form-row"></div>
+      <div class="form-row" style="margin-top:10px">
+        <div class="field"><label>Branch</label><select id="rep-branch"><option value="">All</option>${branchOptions()}</select></div>
+        <div class="field"><label>Employee id</label><input type="number" id="rep-employee" placeholder="optional"/></div>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-primary" onclick="runReport()">Run report</button>
+        <button class="btn btn-secondary" onclick="downloadReport('excel')">Download Excel</button>
+        <button class="btn btn-secondary" onclick="downloadReport('pdf')">Download PDF</button>
+      </div>
+    </div>
+    <div class="card"><div id="rep-output"><div class="muted">Run a report to see results.</div></div></div>
+  `;
+  onReportTypeChange();
+}
+function onReportTypeChange(){
+  reportType = $('#rep-type').value;
+  const def = REPORT_TYPES.find(r=>r.id===reportType);
+  const fieldsEl = $('#rep-fields');
+  const fieldHtml = { date: `<div class="field"><label>Date</label><input type="date" id="rep-date" value="${todayStr()}"/></div>`,
+    year: `<div class="field"><label>Year</label><input type="number" id="rep-year" value="${new Date().getFullYear()}"/></div>`,
+    month: `<div class="field"><label>Month (1-12)</label><input type="number" id="rep-month" value="${new Date().getMonth()+1}" min="1" max="12"/></div>`,
+    date_from: `<div class="field"><label>From</label><input type="date" id="rep-date-from" value="${todayStr()}"/></div>`,
+    date_to: `<div class="field"><label>To</label><input type="date" id="rep-date-to" value="${todayStr()}"/></div>`,
+  };
+  fieldsEl.innerHTML = def.fields.map(f => fieldHtml[f]).join('');
+}
+function reportParams(){
+  const p = { branch: $('#rep-branch').value, employee: $('#rep-employee').value };
+  const def = REPORT_TYPES.find(r=>r.id===reportType);
+  if (def.fields.includes('date')) p.date = $('#rep-date').value;
+  if (def.fields.includes('year')) p.year = $('#rep-year').value;
+  if (def.fields.includes('month')) p.month = $('#rep-month').value;
+  if (def.fields.includes('date_from')) p.date_from = $('#rep-date-from').value;
+  if (def.fields.includes('date_to')) p.date_to = $('#rep-date-to').value;
+  return p;
+}
+async function runReport(){
+  const el = $('#rep-output');
+  el.innerHTML = '<div class="muted">Running…</div>';
+  try{
+    const data = await apiFetch(`/reports/${reportType}/`, {params: reportParams()});
+    el.innerHTML = `<h4>${esc(data.title)}</h4>
+      <div class="table-wrap"><table><thead><tr>${data.columns.map(c=>`<th>${esc(c)}</th>`).join('')}</tr></thead>
+      <tbody>${data.rows.length ? data.rows.map(row=>`<tr>${row.map(cell=>`<td>${esc(cell)}</td>`).join('')}</tr>`).join('') : emptyRow(data.columns.length,'No data for this period.')}</tbody></table></div>`;
+  }catch(e){ el.innerHTML = `<div class="banner err">${esc(e.message)}</div>`; }
+}
+async function downloadReport(kind){
+  try{
+    const params = Object.assign({export: kind}, reportParams());
+    const qs = new URLSearchParams();
+    Object.entries(params).forEach(([k,v]) => { if (v!==undefined && v!==null && v!=='') qs.append(k,v); });
+    const url = state.apiBase.replace(/\/$/, '') + `/reports/${reportType}/?` + qs.toString();
+    const res = await fetch(url, {headers: {Authorization:'Bearer '+state.access}});
+    if (!res.ok){
+      const body = await res.json().catch(()=>null);
+      throw new Error(formatApiError(body) || `Download failed (${res.status})`);
+    }
+    const blob = await res.blob();
+    const dlUrl = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = dlUrl; a.download = `${reportType}.${kind==='excel'?'xlsx':'pdf'}`;
+    document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(dlUrl);
+    toast(`${kind.toUpperCase()} downloaded.`, 'ok');
+  }catch(e){ toast(e.message, 'err'); }
+}
+
+/* =====================================================================
+   14. NOTIFICATIONS  (Module 9)
+===================================================================== */
+async function renderNotifications(){
+  const page = $('#content .page');
+  page.innerHTML = `
+    <div class="page-desc">Your own inbox only — every push trigger the backend fires (shift start/end, late arrival, geofence enter/exit, GPS disabled, internet disconnected, absent) lands here, whether or not a real device is registered to receive an actual push (delivery is stubbed — see Module 9's README notes).</div>
+    <div class="card">
+      <div class="card-head"><h3>Inbox</h3>
+        <div class="btn-row" style="margin-top:0">
+          <select id="notif-filter" onchange="loadNotifications()"><option value="">All</option><option value="false">Unread only</option></select>
+          <button class="btn btn-secondary btn-sm" onclick="markAllRead()">Mark all read</button>
+        </div>
+      </div>
+      <div id="notif-list"></div>
+    </div>
+  `;
+  loadNotifications();
+}
+async function loadNotifications(){
+  const el = $('#notif-list');
+  el.innerHTML = '<div class="muted">Loading…</div>';
+  try{
+    const data = await apiFetch('/notifications/', {params:{is_read:$('#notif-filter').value, page_size:100}});
+    const rows = data.results || data;
+    const typeColor = {SHIFT_START:'pill-blue', SHIFT_END:'pill-blue', LATE_ARRIVAL:'pill-amber', ABSENT:'pill-red',
+      GEOFENCE_ENTER:'pill-green', GEOFENCE_EXIT:'pill-gray', GPS_DISABLED:'pill-violet', INTERNET_DISCONNECTED:'pill-red'};
+    el.innerHTML = rows.length ? rows.map(n => `
+      <div style="display:flex;gap:12px;padding:12px 4px;border-bottom:1px solid #EFF1F4;${n.is_read?'opacity:.6':''}">
+        <span class="pill ${typeColor[n.notification_type]||'pill-gray'}" style="white-space:nowrap;height:fit-content">${esc(n.notification_type.replace('_',' '))}</span>
+        <div style="flex:1">
+          <b style="font-size:13px">${esc(n.title)}</b>
+          <div class="small muted">${esc(n.body)}</div>
+          <div class="small muted" style="margin-top:3px">${fmtDateTime(n.created_at)} · delivery: ${esc(n.delivery_status)}</div>
+        </div>
+        ${!n.is_read ? `<button class="btn btn-secondary btn-sm" onclick="markRead(${n.id})">Mark read</button>` : ''}
+      </div>
+    `).join('') : '<div class="muted" style="padding:20px 0">No notifications yet — trigger one from Attendance or Live Tracking.</div>';
+  }catch(e){ el.innerHTML = `<div class="banner err">${esc(e.message)}</div>`; }
+}
+async function markRead(id){
+  try{ await apiFetch(`/notifications/${id}/read/`, {method:'POST'}); loadNotifications(); refreshUnreadBadge(); }
+  catch(e){ toast(e.message, 'err'); }
+}
+async function markAllRead(){
+  try{ await apiFetch('/notifications/mark-all-read/', {method:'POST'}); loadNotifications(); refreshUnreadBadge(); toast('All marked read.', 'ok'); }
+  catch(e){ toast(e.message, 'err'); }
+}
+
+/* ---------------------------------------------------------------------
+   15. INIT
+--------------------------------------------------------------------- */
+document.addEventListener('DOMContentLoaded', () => {
+  refreshApiLabels();
+  if (state.access && state.user){ showApp(); }
+  else { $('#login-screen').style.display = 'flex'; }
+  $('#api-base-input') && ($('#api-base-input').value = state.apiBase);
+});
+</script>
+</body>
+</html>

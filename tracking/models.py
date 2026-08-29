@@ -1,0 +1,131 @@
+"""
+Module 6 - Live Employee Tracking.
+
+Two models, two different jobs:
+- `LocationPing` is an append-only history of every location report from
+  the mobile app (audit trail, and raw material for Module 8's "distance
+  travelled"/"site visits" reports in V2).
+- `EmployeeLiveStatus` is one row per employee, overwritten on every ping,
+  so the live dashboard (Module 7) can answer "where is everyone right now"
+  with a single indexed query instead of scanning ping history.
+
+Every ping also runs through Module 4's geofence containment check, and a
+work-area transition (no-area -> area, or area -> no-area) automatically
+fires Module 5's attendance check-in/check-out — see `services.py`.
+"""
+from django.conf import settings
+from django.contrib.gis.db import models as gis_models
+from django.db import models
+from django.utils import timezone
+
+from companies.models import Branch, Company
+from employees.models import Employee
+from geofence.models import WorkArea
+
+# How stale a ping can be before we consider the employee OFFLINE on the
+# live dashboard, regardless of what their device last reported.
+ONLINE_THRESHOLD_MINUTES = getattr(settings, "LIVE_TRACKING_ONLINE_THRESHOLD_MINUTES", 5)
+
+
+class ConnectivityStatus(models.TextChoices):
+    ONLINE = "ONLINE", "Online"
+    OFFLINE = "OFFLINE", "Offline"
+    GPS_DISABLED = "GPS_DISABLED", "GPS Disabled"
+    INTERNET_DISCONNECTED = "INTERNET_DISCONNECTED", "Internet Disconnected"
+
+
+class ShiftLiveStatus(models.TextChoices):
+    NOT_STARTED = "NOT_STARTED", "Not Started"
+    WORKING = "WORKING", "Working"
+    SHIFT_ENDED = "SHIFT_ENDED", "Shift Ended"
+    ABSENT = "ABSENT", "Absent"
+
+
+class LocationPing(models.Model):
+    employee = models.ForeignKey(Employee, on_delete=models.CASCADE, related_name="location_pings")
+    company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name="location_pings")
+
+    location = gis_models.PointField(srid=4326, spatial_index=True)
+    accuracy_meters = models.FloatField(null=True, blank=True)
+    battery_level = models.PositiveSmallIntegerField(null=True, blank=True, help_text="0-100")
+    gps_enabled = models.BooleanField(default=True)
+    network_connected = models.BooleanField(default=True)
+
+    work_area = models.ForeignKey(
+        WorkArea, on_delete=models.SET_NULL, null=True, blank=True, related_name="location_pings"
+    )
+
+    # Client-reported capture time vs. when our server actually received it —
+    # kept separate since mobile pings can arrive delayed/batched after a
+    # period of no signal.
+    recorded_at = models.DateTimeField()
+    received_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["employee", "-recorded_at"]),
+            models.Index(fields=["company", "-recorded_at"]),
+        ]
+        ordering = ["-recorded_at"]
+
+    def __str__(self):
+        return f"{self.employee.employee_code} @ {self.recorded_at}"
+
+    @property
+    def latitude(self):
+        return self.location.y
+
+    @property
+    def longitude(self):
+        return self.location.x
+
+
+class EmployeeLiveStatus(models.Model):
+    employee = models.OneToOneField(Employee, on_delete=models.CASCADE, related_name="live_status")
+    company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name="employee_live_statuses")
+    branch = models.ForeignKey(Branch, on_delete=models.SET_NULL, null=True, blank=True)
+
+    last_location = gis_models.PointField(srid=4326, null=True, blank=True)
+    last_accuracy_meters = models.FloatField(null=True, blank=True)
+    last_battery_level = models.PositiveSmallIntegerField(null=True, blank=True)
+    gps_enabled = models.BooleanField(default=True)
+    network_connected = models.BooleanField(default=True)
+    last_ping_at = models.DateTimeField(null=True, blank=True)
+
+    current_work_area = models.ForeignKey(
+        WorkArea, on_delete=models.SET_NULL, null=True, blank=True, related_name="employees_currently_here"
+    )
+
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name_plural = "Employee live statuses"
+        indexes = [models.Index(fields=["company", "branch", "last_ping_at"])]
+        ordering = ["-last_ping_at"]
+
+    def __str__(self):
+        return f"{self.employee.employee_code} live status"
+
+    @property
+    def is_online(self):
+        if not self.last_ping_at:
+            return False
+        return (timezone.now() - self.last_ping_at) <= timezone.timedelta(minutes=ONLINE_THRESHOLD_MINUTES)
+
+    @property
+    def connectivity_status(self):
+        if not self.is_online:
+            return ConnectivityStatus.OFFLINE
+        if not self.gps_enabled:
+            return ConnectivityStatus.GPS_DISABLED
+        if not self.network_connected:
+            return ConnectivityStatus.INTERNET_DISCONNECTED
+        return ConnectivityStatus.ONLINE
+
+    @property
+    def last_latitude(self):
+        return self.last_location.y if self.last_location else None
+
+    @property
+    def last_longitude(self):
+        return self.last_location.x if self.last_location else None

@@ -1,0 +1,24 @@
+# NOTE (Module 4 - GeoDjango): django.contrib.gis ships with Django itself,
+# no extra pip package needed. But it requires GEOS, GDAL, and PROJ system
+# libraries on the host, and the database must be PostGIS-enabled:
+#   Ubuntu/Debian: apt-get install gdal-bin libgdal-dev libgeos-dev libproj-dev
+#   Postgres:      CREATE EXTENSION postgis;  (run once per database)
+Django>=5.0,<5.1
+djangorestframework>=3.15
+djangorestframework-simplejwt>=5.3
+django-filter>=24.2
+psycopg2-binary>=2.9
+django-cors-headers>=4.3
+Pillow>=10.3
+openpyxl>=3.1
+reportlab>=4.0
+celery>=5.4
+redis>=5.0
+python-decouple>=3.8
+
+# Production deployment (Render / any real host — not needed for
+# `manage.py runserver` locally, but required once this isn't running on
+# your own laptop):
+gunicorn>=22.0          # the actual production WSGI server (runserver is dev-only)
+whitenoise>=6.7          # serves CSS/JS/admin static files without a separate CDN
+dj-database-url>=2.2     # parses Render's single DATABASE_URL into Django's DB settings
