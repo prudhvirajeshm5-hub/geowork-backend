@@ -113,6 +113,21 @@ class EmployeeLiveStatus(models.Model):
         return (timezone.now() - self.last_ping_at) <= timezone.timedelta(minutes=ONLINE_THRESHOLD_MINUTES)
 
     @property
+    def minutes_since_last_ping(self):
+        """
+        Raw staleness in minutes, regardless of the online/offline cutoff.
+        Lets the dashboard show "Last seen 9m ago" instead of a hard
+        Online/Offline binary — useful because background location on
+        Android is inherently bursty (OS-level GPS/CPU throttling once the
+        screen is off), so a short gap doesn't necessarily mean the
+        employee actually stopped their shift.
+        """
+        if not self.last_ping_at:
+            return None
+        delta = timezone.now() - self.last_ping_at
+        return max(0, int(delta.total_seconds() // 60))
+
+    @property
     def connectivity_status(self):
         if not self.is_online:
             return ConnectivityStatus.OFFLINE

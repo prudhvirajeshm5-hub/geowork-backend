@@ -23,6 +23,7 @@ class EmployeeLiveStatusSerializer(serializers.ModelSerializer):
     last_longitude = serializers.FloatField(read_only=True)
     is_online = serializers.BooleanField(read_only=True)
     connectivity_status = serializers.CharField(read_only=True)
+    minutes_since_last_ping = serializers.IntegerField(read_only=True)
     shift_status = serializers.SerializerMethodField()
 
     class Meta:
@@ -31,6 +32,7 @@ class EmployeeLiveStatusSerializer(serializers.ModelSerializer):
             "employee", "employee_name", "employee_code", "branch", "branch_name",
             "last_latitude", "last_longitude", "last_accuracy_meters", "last_battery_level",
             "gps_enabled", "network_connected", "last_ping_at", "is_online", "connectivity_status",
+            "minutes_since_last_ping",
             "current_work_area", "current_work_area_name", "shift_status", "updated_at",
         )
         read_only_fields = fields
