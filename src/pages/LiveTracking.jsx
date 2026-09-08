@@ -15,6 +15,26 @@ const CONNECTIVITY = {
   INTERNET_DISCONNECTED: { tone: "red", label: "No internet", color: "#A8342B" },
 };
 
+// Android background location is inherently bursty — the OS throttles
+// GPS/CPU wake-ups once the screen is off, so a short gap between pings
+// doesn't mean the employee actually ended their shift. Rather than flip
+// straight to a flat gray "Offline" the moment the online threshold is
+// crossed, show a distinct "Reconnecting" state for a grace window so it
+// doesn't read as a hard failure — only fall back to plain "Offline" once
+// it's been stale long enough to actually mean something.
+const RECONNECTING_GRACE_MINUTES = 20;
+
+function displayConnectivity(row) {
+  if (
+    row.connectivity_status === "OFFLINE" &&
+    row.minutes_since_last_ping != null &&
+    row.minutes_since_last_ping <= RECONNECTING_GRACE_MINUTES
+  ) {
+    return { tone: "amber", label: "Reconnecting", color: "#B1690F" };
+  }
+  return CONNECTIVITY[row.connectivity_status] || CONNECTIVITY.OFFLINE;
+}
+
 function pinIcon(color) {
   return {
     path: "M 0,0 C -6,-10 -10,-15 -10,-20 A 10,10 0 1 1 10,-20 C 10,-15 6,-10 0,0 Z",
@@ -129,7 +149,7 @@ export default function LiveTracking() {
               options={{ streetViewControl: false, fullscreenControl: true }}
             >
               {located.map((r) => {
-                const conn = CONNECTIVITY[r.connectivity_status] || CONNECTIVITY.OFFLINE;
+                const conn = displayConnectivity(r);
                 return (
                   <Marker
                     key={r.employee}
@@ -147,7 +167,7 @@ export default function LiveTracking() {
                   <div>
                     <strong>{selected.employee_name}</strong>
                     <br />
-                    {(CONNECTIVITY[selected.connectivity_status] || CONNECTIVITY.OFFLINE).label} · {timeAgo(selected.last_ping_at)}
+                    {displayConnectivity(selected).label} · {timeAgo(selected.last_ping_at)}
                     <br />
                     {selected.current_work_area_name || "Outside any work area"}
                   </div>
@@ -186,7 +206,7 @@ export default function LiveTracking() {
                 .slice()
                 .sort((a, b) => (a.connectivity_status === "ONLINE" ? -1 : 1) - (b.connectivity_status === "ONLINE" ? -1 : 1))
                 .map((r) => {
-                  const conn = CONNECTIVITY[r.connectivity_status] || CONNECTIVITY.OFFLINE;
+                  const conn = displayConnectivity(r);
                   return (
                     <div
                       key={r.employee}

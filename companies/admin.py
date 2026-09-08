@@ -45,7 +45,10 @@ class WorkingDayInline(admin.TabularInline):
 
 @admin.register(ShiftTiming)
 class ShiftTimingAdmin(admin.ModelAdmin):
-    list_display = ("name", "company", "start_time", "end_time", "is_night_shift", "is_active")
+    list_display = (
+        "name", "company", "start_time", "end_time", "break_start_time", "break_end_time",
+        "is_night_shift", "is_active",
+    )
     list_filter = ("company", "is_active", "is_night_shift")
     search_fields = ("name",)
     inlines = [WorkingDayInline]

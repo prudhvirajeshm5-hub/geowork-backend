@@ -20,6 +20,8 @@ class AttendanceRecordSerializer(serializers.ModelSerializer):
     check_in_work_area_name = serializers.CharField(source="check_in_work_area.name", read_only=True, default=None)
     check_out_work_area_name = serializers.CharField(source="check_out_work_area.name", read_only=True, default=None)
     working_hours = serializers.SerializerMethodField()
+    is_on_break = serializers.BooleanField(read_only=True)
+    current_break_minutes = serializers.IntegerField(read_only=True)
 
     class Meta:
         model = AttendanceRecord
@@ -31,6 +33,7 @@ class AttendanceRecordSerializer(serializers.ModelSerializer):
             "check_out_work_area", "check_out_work_area_name", "check_out_source",
             "status", "is_late", "late_by_minutes", "is_early_exit", "early_exit_by_minutes",
             "working_minutes", "working_hours", "is_outdoor_duty",
+            "total_break_minutes", "is_on_break", "current_break_minutes",
         )
         read_only_fields = fields
 

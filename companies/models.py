@@ -107,6 +107,21 @@ class ShiftTiming(models.Model):
     full_day_minutes = models.PositiveIntegerField(
         default=480, help_text="Minutes of presence required for a full working day"
     )
+    # Scheduled lunch/meal break window. Both null (the default) means this
+    # shift has no configured break — geofence EXIT always auto checks-out,
+    # same as before this feature existed. When both are set, a geofence
+    # EXIT that happens inside this window is treated as "gone on break"
+    # instead of "end of shift": attendance.services.process_geofence_event
+    # opens a BreakPeriod instead of ending the shift, and the matching
+    # re-ENTER closes it and adds the elapsed minutes to the day's
+    # AttendanceRecord.total_break_minutes — the employee is never auto
+    # checked-out for leaving during this window.
+    break_start_time = models.TimeField(
+        null=True, blank=True, help_text="Start of the daily lunch/meal break, if any"
+    )
+    break_end_time = models.TimeField(
+        null=True, blank=True, help_text="End of the daily lunch/meal break, if any"
+    )
     is_active = models.BooleanField(default=True)
 
     class Meta:

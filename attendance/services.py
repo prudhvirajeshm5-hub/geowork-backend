@@ -13,7 +13,7 @@ from accounts.models import Role
 from geofence.services import find_containing_work_area
 from notifications import services as notification_services
 
-from .models import AttendanceRecord, AttendanceSource, AttendanceStatus, OutdoorDutyRequest
+from .models import AttendanceRecord, AttendanceSource, AttendanceStatus, BreakPeriod, OutdoorDutyRequest
 
 
 class NotInWorkAreaError(ValidationError):
@@ -154,21 +154,65 @@ def process_geofence_event(user, event_type, latitude, longitude):
     """
     Entry point for Module 6 (live tracking) / the mobile app's background
     geofence listener. `event_type` is "ENTER" or "EXIT". An ENTER auto
-    checks-in the first time in a day; an EXIT auto checks-out. Repeated
-    ENTER/EXIT events for the same day are safely idempotent — see
-    start_shift/end_shift above.
+    checks-in the first time in a day; an EXIT auto checks-out — UNLESS the
+    exit happens during the employee's shift's configured lunch/meal break
+    window (ShiftTiming.break_start_time/break_end_time), in which case it
+    opens a BreakPeriod instead and leaves the employee checked in. The
+    matching re-ENTER closes that break and adds the elapsed minutes to
+    the day's AttendanceRecord.total_break_minutes, rather than being
+    treated as a fresh check-in. Repeated ENTER/EXIT events for the same
+    day (or the same break) are safely idempotent.
     """
+    employee = _get_employee_or_403(user)
+    now = timezone.now()
+
     if event_type == "ENTER":
+        record = get_or_create_today_record(employee)
+        open_break = record.breaks.filter(ended_at__isnull=True).order_by("-started_at").first()
+        if open_break is not None:
+            _close_break(record, open_break, now)
+            return record
         return start_shift(user, latitude, longitude, source=AttendanceSource.AUTO_GEOFENCE)
+
     if event_type == "EXIT":
-        employee = _get_employee_or_403(user)
         record = get_or_create_today_record(employee)
         if record.check_in_time is None:
             # Exiting a work area without ever having checked in isn't an
             # attendance event (e.g. someone just walking past the gate).
             return record
+        if record.check_out_time is not None:
+            # Already checked out for the day — nothing to do.
+            return record
+        if _is_within_break_window(record.shift or employee.shift, now):
+            _start_break(record, now)
+            return record
         return end_shift(user, latitude, longitude, source=AttendanceSource.AUTO_GEOFENCE)
+
     raise ValidationError({"event_type": "Must be 'ENTER' or 'EXIT'."})
+
+
+def _is_within_break_window(shift, when):
+    if shift is None or shift.break_start_time is None or shift.break_end_time is None:
+        return False
+    local_time = timezone.localtime(when).time()
+    return shift.break_start_time <= local_time <= shift.break_end_time
+
+
+def _start_break(record, now):
+    # Idempotent: a repeated EXIT while already on break (e.g. GPS jitter
+    # right at the geofence boundary) must not open a second concurrent
+    # break for the same employee.
+    if record.breaks.filter(ended_at__isnull=True).exists():
+        return
+    BreakPeriod.objects.create(attendance_record=record, started_at=now)
+
+
+def _close_break(record, break_period, now):
+    break_period.ended_at = now
+    break_period.duration_minutes = max(0, int((now - break_period.started_at).total_seconds() // 60))
+    break_period.save()
+    record.total_break_minutes = (record.total_break_minutes or 0) + break_period.duration_minutes
+    record.save(update_fields=["total_break_minutes", "updated_at"])
 
 
 def _can_decide_outdoor_duty(user, request_obj):

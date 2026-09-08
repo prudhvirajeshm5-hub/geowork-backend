@@ -66,6 +66,12 @@ class AttendanceRecord(models.Model):
     # legitimate field visit from a geofence-less check-in that shouldn't
     # have been allowed.
     is_outdoor_duty = models.BooleanField(default=False)
+    # Cached sum of every BreakPeriod.duration_minutes below, kept in sync
+    # by attendance.services whenever a break closes — a plain field so
+    # Reports/serializers don't need to aggregate the related BreakPeriod
+    # rows on every read. Does NOT include time still out on an open
+    # (unclosed) break — see AttendanceRecord.current_break_minutes for that.
+    total_break_minutes = models.PositiveIntegerField(default=0)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -84,6 +90,42 @@ class AttendanceRecord(models.Model):
     @property
     def is_checked_in(self):
         return self.check_in_time is not None and self.check_out_time is None
+
+    @property
+    def is_on_break(self):
+        return self.breaks.filter(ended_at__isnull=True).exists()
+
+    @property
+    def current_break_minutes(self):
+        """Elapsed minutes on a break that's still open right now, or 0."""
+        open_break = self.breaks.filter(ended_at__isnull=True).order_by("-started_at").first()
+        if open_break is None:
+            return 0
+        return max(0, int((timezone.now() - open_break.started_at).total_seconds() // 60))
+
+
+class BreakPeriod(models.Model):
+    """
+    One lunch/meal break: the employee left their work area's geofence
+    during the shift's configured break window and re-entered later.
+    `ended_at` is null while they're still out — see
+    attendance.services._is_within_break_window / _start_break / _close_break.
+    """
+
+    attendance_record = models.ForeignKey(AttendanceRecord, on_delete=models.CASCADE, related_name="breaks")
+    started_at = models.DateTimeField()
+    ended_at = models.DateTimeField(null=True, blank=True)
+    duration_minutes = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        ordering = ["-started_at"]
+        indexes = [
+            models.Index(fields=["attendance_record", "ended_at"]),
+        ]
+
+    def __str__(self):
+        status = "in progress" if self.ended_at is None else f"{self.duration_minutes} min"
+        return f"{self.attendance_record.employee.employee_code} break ({status})"
 
 
 class OutdoorDutyRequest(models.Model):
