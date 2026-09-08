@@ -14,14 +14,25 @@ def tokens_for_user(user):
 
 class UserSerializer(serializers.ModelSerializer):
     full_name = serializers.CharField(source="get_full_name", read_only=True)
+    # Lets clients (mobile app) decide whether to offer Start/End Shift
+    # based on whether an Employee record actually exists — not on role
+    # alone. A MANAGER/ADMIN can be a field employee too (e.g. a floor
+    # supervisor who also clocks in), and this is how the app tells them
+    # apart from a pure back-office manager/admin with no shift of their
+    # own to track.
+    has_employee_profile = serializers.SerializerMethodField()
 
     class Meta:
         model = User
         fields = (
             "id", "phone", "email", "first_name", "last_name", "full_name",
             "role", "company", "is_active", "is_phone_verified", "date_joined",
+            "has_employee_profile",
         )
         read_only_fields = ("id", "role", "company", "is_active", "date_joined", "is_phone_verified")
+
+    def get_has_employee_profile(self, obj):
+        return hasattr(obj, "employee_profile") and obj.employee_profile is not None
 
 
 class RegisterSerializer(serializers.ModelSerializer):
