@@ -66,7 +66,8 @@ class ShiftTimingSerializer(serializers.ModelSerializer):
         fields = (
             "id", "company", "branch", "name", "start_time", "end_time",
             "is_night_shift", "grace_period_minutes", "half_day_after_minutes",
-            "full_day_minutes", "is_active", "working_days",
+            "full_day_minutes", "break_start_time", "break_end_time",
+            "is_active", "working_days",
         )
         read_only_fields = ("id", "company")
 
@@ -80,4 +81,19 @@ class ShiftTimingSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 "end_time is before start_time; set is_night_shift=true for overnight shifts."
             )
+
+        break_start = attrs.get("break_start_time", getattr(self.instance, "break_start_time", None))
+        break_end = attrs.get("break_end_time", getattr(self.instance, "break_end_time", None))
+        # Both-or-neither: a shift with only one side set would silently
+        # never match _is_within_break_window in attendance/services.py,
+        # which looks like the feature not working rather than a config
+        # error, so reject it up front instead.
+        if bool(break_start) != bool(break_end):
+            raise serializers.ValidationError(
+                "Set both break_start_time and break_end_time, or leave both blank for no break."
+            )
+        if break_start and break_end and break_start >= break_end:
+            raise serializers.ValidationError("break_end_time must be after break_start_time.")
+        if break_start and (start and end and not is_night) and not (start <= break_start and break_end <= end):
+            raise serializers.ValidationError("The break window must fall within the shift's start/end time.")
         return attrs

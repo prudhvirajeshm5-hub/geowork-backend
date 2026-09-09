@@ -7,14 +7,6 @@ import { Alert, EmptyState, Field, Loading, Modal, StatusBadge } from "../compon
 const TABS = ["Profile", "Branches", "Departments", "Designations", "Shifts"];
 const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
-function slugify(value) {
-  return value
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/(^-|-$)/g, "");
-}
-
 export default function CompanySetup() {
   const [tab, setTab] = useState("Profile");
 
@@ -48,111 +40,7 @@ export default function CompanySetup() {
 /* ---------------------------------- Profile ---------------------------------- */
 
 function ProfileTab() {
-  const { user, refreshUser } = useAuth();
-
-  // A user with no company yet (fresh ADMIN-role account, nothing set up
-  // in Django admin) sets up their company right here — no separate
-  // "assign company to user" step needed. See CompanyViewSet.perform_create.
-  if (!user?.company) {
-    return <CreateCompanyForm onCreated={refreshUser} />;
-  }
-
-  return <EditCompanyForm companyId={user.company} />;
-}
-
-function CreateCompanyForm({ onCreated }) {
-  const [form, setForm] = useState({
-    name: "",
-    slug: "",
-    contact_email: "",
-    contact_phone: "",
-    gstin: "",
-    timezone: "Asia/Kolkata",
-    registered_address: "",
-  });
-  const [slugTouched, setSlugTouched] = useState(false);
-  const [error, setError] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-
-  const set = (k) => (e) => {
-    const value = e.target.value;
-    setForm((f) => ({
-      ...f,
-      [k]: value,
-      // Keep the slug in sync with the name until the person edits the
-      // slug field directly themselves.
-      slug: k === "name" && !slugTouched ? slugify(value) : f.slug,
-    }));
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setSubmitting(true);
-    setError("");
-    try {
-      await api.post("/company/companies/", form);
-      await onCreated();
-    } catch (err) {
-      setError(apiErrorMessage(err, "Couldn't set up the company."));
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  return (
-    <div className="card card-pad" style={{ maxWidth: 640 }}>
-      <div style={{ marginBottom: 16 }}>
-        <h3 style={{ margin: 0 }}>Set up your company</h3>
-        <p className="card-head-sub" style={{ marginTop: 4 }}>
-          This account isn't tied to a company yet. Fill this in once to get started — you'll be able to add branches, departments and shifts right after.
-        </p>
-      </div>
-      <form onSubmit={handleSubmit}>
-        <Alert>{error}</Alert>
-        <div className="form-grid">
-          <Field label="Company name">
-            <input className="input" required value={form.name} onChange={set("name")} />
-          </Field>
-          <Field label="Slug" hint="Used internally to identify your company">
-            <input
-              className="input"
-              required
-              value={form.slug}
-              onChange={(e) => {
-                setSlugTouched(true);
-                set("slug")(e);
-              }}
-            />
-          </Field>
-          <Field label="Contact email">
-            <input className="input" type="email" value={form.contact_email} onChange={set("contact_email")} />
-          </Field>
-          <Field label="Contact phone">
-            <input className="input" value={form.contact_phone} onChange={set("contact_phone")} />
-          </Field>
-          <Field label="GSTIN">
-            <input className="input" value={form.gstin} onChange={set("gstin")} />
-          </Field>
-          <Field label="Timezone">
-            <input className="input" value={form.timezone} onChange={set("timezone")} />
-          </Field>
-        </div>
-        <div className="form-grid cols-1" style={{ marginTop: 14 }}>
-          <Field label="Registered address">
-            <textarea className="input" value={form.registered_address} onChange={set("registered_address")} />
-          </Field>
-        </div>
-        <div className="form-actions" style={{ justifyContent: "flex-start" }}>
-          <button className="btn btn-primary" disabled={submitting}>
-            {submitting ? "Setting up…" : "Create company"}
-          </button>
-        </div>
-      </form>
-    </div>
-  );
-}
-
-function EditCompanyForm({ companyId }) {
+  const { user } = useAuth();
   const [company, setCompany] = useState(null);
   const [form, setForm] = useState(null);
   const [error, setError] = useState("");
@@ -160,20 +48,12 @@ function EditCompanyForm({ companyId }) {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    api
-      .get(`/company/companies/${companyId}/`)
-      .then(({ data }) => {
-        setCompany(data);
-        setForm(data);
-      })
-      .catch((err) => {
-        // Previously this had no .catch() at all: any failed request (403,
-        // 404, network error) left `form` as null forever, so the page was
-        // stuck on the loading spinner indefinitely with zero indication
-        // anything had gone wrong.
-        setError(apiErrorMessage(err, "Couldn't load the company profile."));
-      });
-  }, [companyId]);
+    if (!user?.company) return;
+    api.get(`/company/companies/${user.company}/`).then(({ data }) => {
+      setCompany(data);
+      setForm(data);
+    });
+  }, [user]);
 
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
 
@@ -201,14 +81,7 @@ function EditCompanyForm({ companyId }) {
     }
   };
 
-  if (!form && !error) return <Loading label="Loading company profile…" />;
-  if (!form && error) {
-    return (
-      <div className="card card-pad" style={{ maxWidth: 640 }}>
-        <Alert>{error}</Alert>
-      </div>
-    );
-  }
+  if (!form) return <Loading label="Loading company profile…" />;
 
   return (
     <div className="card card-pad" style={{ maxWidth: 640 }}>
@@ -718,6 +591,7 @@ function ShiftsTab() {
               <tr>
                 <th>Shift</th>
                 <th>Timing</th>
+                <th>Break</th>
                 <th>Grace</th>
                 <th>Working days</th>
                 <th>Status</th>
@@ -737,6 +611,9 @@ function ShiftsTab() {
                   </td>
                   <td className="mono">
                     {s.start_time}–{s.end_time}
+                  </td>
+                  <td className="mono">
+                    {s.break_start_time && s.break_end_time ? `${s.break_start_time}–${s.break_end_time}` : <span className="cell-sub">None</span>}
                   </td>
                   <td>{s.grace_period_minutes}m</td>
                   <td>
@@ -797,9 +674,16 @@ function ShiftModal({ shift, branches, onClose, onSaved }) {
           grace_period_minutes: 10,
           half_day_after_minutes: 240,
           full_day_minutes: 480,
+          break_start_time: "",
+          break_end_time: "",
           is_active: true,
         }
   );
+  // Whether this shift has a configured lunch/meal break at all — kept as
+  // its own toggle (rather than just checking the time fields) so clearing
+  // both times to remove a break is an explicit action, not an accident of
+  // blanking an input.
+  const [hasBreak, setHasBreak] = useState(Boolean(shift?.break_start_time && shift?.break_end_time));
   const [workingDays, setWorkingDays] = useState(() => {
     const base = Array(7).fill(true);
     (shift?.working_days || []).forEach((wd) => {
@@ -831,6 +715,11 @@ function ShiftModal({ shift, branches, onClose, onSaved }) {
     e.preventDefault();
     setSubmitting(true);
     setError("");
+    if (hasBreak && (!form.break_start_time || !form.break_end_time)) {
+      setError("Set both a break start time and a break end time, or turn off the lunch break toggle.");
+      setSubmitting(false);
+      return;
+    }
     try {
       const payload = {
         name: form.name,
@@ -841,6 +730,11 @@ function ShiftModal({ shift, branches, onClose, onSaved }) {
         grace_period_minutes: Number(form.grace_period_minutes),
         half_day_after_minutes: Number(form.half_day_after_minutes),
         full_day_minutes: Number(form.full_day_minutes),
+        // Explicitly null (not just omitted) when the toggle is off, so
+        // turning off an existing break actually clears it on the backend
+        // instead of leaving the old times in place.
+        break_start_time: hasBreak ? form.break_start_time : null,
+        break_end_time: hasBreak ? form.break_end_time : null,
         is_active: form.is_active,
       };
       let shiftId = shift?.id;
@@ -898,6 +792,43 @@ function ShiftModal({ shift, branches, onClose, onSaved }) {
           <input type="checkbox" id="night" checked={form.is_night_shift} onChange={(e) => setForm((f) => ({ ...f, is_night_shift: e.target.checked }))} />
           <label htmlFor="night">Overnight shift (end time falls the next day)</label>
         </div>
+
+        <hr className="divider-dash" />
+
+        <div className="checkbox-row">
+          <input
+            type="checkbox"
+            id="hasBreak"
+            checked={hasBreak}
+            onChange={(e) => setHasBreak(e.target.checked)}
+          />
+          <label htmlFor="hasBreak">Employees get a lunch/meal break during this shift</label>
+        </div>
+        {hasBreak && (
+          <div className="form-grid" style={{ marginTop: 10 }}>
+            <Field label="Break start time">
+              <input
+                className="input"
+                type="time"
+                required={hasBreak}
+                value={form.break_start_time ? form.break_start_time.slice(0, 5) : ""}
+                onChange={set("break_start_time")}
+              />
+            </Field>
+            <Field label="Break end time">
+              <input
+                className="input"
+                type="time"
+                required={hasBreak}
+                value={form.break_end_time ? form.break_end_time.slice(0, 5) : ""}
+                onChange={set("break_end_time")}
+              />
+            </Field>
+          </div>
+        )}
+        <p className="hint" style={{ marginTop: hasBreak ? 6 : -4 }}>
+          Leaving work during this window (e.g. for lunch) won't auto check the employee out — it's logged as a break instead.
+        </p>
 
         <hr className="divider-dash" />
         <Field label="Working days">
