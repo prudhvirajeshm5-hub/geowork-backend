@@ -6,7 +6,7 @@ import { Alert, ConfirmDialog, EmptyState, Field, Loading, Modal, StatusBadge } 
 import { titleCase } from "../lib/format";
 
 const CATEGORIES = ["FACTORY", "WAREHOUSE", "OFFICE", "PARKING", "ASSEMBLY_LINE", "BATTERY_ROOM", "DISPATCH_AREA", "CUSTOMER_SITE", "OTHER"];
-const COLORS = ["#0F6E5C", "#B1690F", "#A8342B", "#29577E", "#7A4FB5", "#12181A"];
+const COLORS = ["#4A90E2", "#B1690F", "#A8342B", "#29577E", "#7A4FB5", "#12181A"];
 
 export default function Geofences() {
   const [workAreas, setWorkAreas] = useState([]);

@@ -158,9 +158,9 @@ export default function GeofenceMap({ workAreas, selectedId, onSelectArea, drawM
               key={wa.id}
               paths={positions}
               options={{
-                strokeColor: wa.color || "#0F6E5C",
+                strokeColor: wa.color || "#4A90E2",
                 strokeWeight: isSelected ? 3 : 1.5,
-                fillColor: wa.color || "#0F6E5C",
+                fillColor: wa.color || "#4A90E2",
                 fillOpacity: isSelected ? 0.28 : 0.1,
                 strokeOpacity: isSelected ? 1 : 0.6,
                 clickable: true,
@@ -174,21 +174,21 @@ export default function GeofenceMap({ workAreas, selectedId, onSelectArea, drawM
           <>
             <Polyline
               path={drawPoints}
-              options={{ strokeColor: "#0F6E5C", strokeWeight: 2, strokeOpacity: 0.8 }}
+              options={{ strokeColor: "#4A90E2", strokeWeight: 2, strokeOpacity: 0.8 }}
             />
             {drawPoints.length > 2 && (
               <Polyline
                 path={[drawPoints[drawPoints.length - 1], drawPoints[0]]}
-                options={{ strokeColor: "#0F6E5C", strokeOpacity: 0.5, strokeWeight: 1.5 }}
+                options={{ strokeColor: "#4A90E2", strokeOpacity: 0.5, strokeWeight: 1.5 }}
               />
             )}
             {drawPoints.map((p, i) => (
-              <Marker key={i} position={p} icon={DOT_ICON("#0F6E5C")} />
+              <Marker key={i} position={p} icon={DOT_ICON("#4A90E2")} />
             ))}
             {preview && (
               <Polyline
                 path={[drawPoints[drawPoints.length - 1], preview]}
-                options={{ strokeColor: "#0F6E5C", strokeOpacity: 0.5, strokeWeight: 1.5 }}
+                options={{ strokeColor: "#4A90E2", strokeOpacity: 0.5, strokeWeight: 1.5 }}
               />
             )}
           </>
@@ -197,7 +197,7 @@ export default function GeofenceMap({ workAreas, selectedId, onSelectArea, drawM
         {rectanglePreviewBounds && (
           <Rectangle
             bounds={rectanglePreviewBounds}
-            options={{ strokeColor: "#0F6E5C", strokeWeight: 2, fillColor: "#0F6E5C", fillOpacity: 0.12, clickable: false }}
+            options={{ strokeColor: "#4A90E2", strokeWeight: 2, fillColor: "#4A90E2", fillOpacity: 0.12, clickable: false }}
           />
         )}
 
@@ -205,7 +205,7 @@ export default function GeofenceMap({ workAreas, selectedId, onSelectArea, drawM
           <Circle
             center={drawPoints[0]}
             radius={distanceMeters(drawPoints[0], preview)}
-            options={{ strokeColor: "#0F6E5C", strokeWeight: 2, fillColor: "#0F6E5C", fillOpacity: 0.1, clickable: false }}
+            options={{ strokeColor: "#4A90E2", strokeWeight: 2, fillColor: "#4A90E2", fillOpacity: 0.1, clickable: false }}
           />
         )}
       </GoogleMap>

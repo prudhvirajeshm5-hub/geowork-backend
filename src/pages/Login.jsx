@@ -43,7 +43,7 @@ export default function Login() {
             <polygon
               points="210,40 360,140 330,340 90,340 60,140"
               fill="none"
-              stroke="#93c44f"
+              stroke="#4A90E2"
               strokeWidth="2"
               strokeDasharray="7 6"
               className="geofence-path"

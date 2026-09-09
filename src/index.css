@@ -22,7 +22,7 @@
   --brand: #2c3a56;
   --brand-dark: #202a3f;
   --brand-soft: #e7eaf0;
-  --brand-line: #93c44f;
+  --brand-line: #4A90E2;
   --brand-accent-gold: #ccab75;
 
   --amber: #b1690f;
@@ -256,7 +256,7 @@ code,
 }
 
 .sidebar-link.active {
-  background: rgba(15, 110, 92, 0.35);
+  background: rgba(74, 144, 226, 0.35);
   color: #fff;
 }
 
@@ -268,7 +268,7 @@ code,
   transform: translateY(-50%);
   width: 8px;
   height: 8px;
-  border: 2px dashed #6fd6b8;
+  border: 2px dashed #7EB6F5;
   border-radius: 2px;
 }
 

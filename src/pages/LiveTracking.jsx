@@ -9,7 +9,7 @@ const DEFAULT_CENTER = { lat: 18.5204, lng: 73.8567 };
 const REFRESH_MS = 20000;
 
 const CONNECTIVITY = {
-  ONLINE: { tone: "green", label: "Online", color: "#0F6E5C" },
+  ONLINE: { tone: "green", label: "Online", color: "#4A90E2" },
   OFFLINE: { tone: "slate", label: "Offline", color: "#7c8b88" },
   GPS_DISABLED: { tone: "amber", label: "GPS disabled", color: "#B1690F" },
   INTERNET_DISCONNECTED: { tone: "red", label: "No internet", color: "#A8342B" },
@@ -157,7 +157,7 @@ export default function LiveTracking() {
                 <Circle
                   center={{ lat: selected.last_latitude, lng: selected.last_longitude }}
                   radius={selected.last_accuracy_meters}
-                  options={{ strokeColor: "#0F6E5C", strokeWeight: 1, fillColor: "#0F6E5C", fillOpacity: 0.08, clickable: false }}
+                  options={{ strokeColor: "#4A90E2", strokeWeight: 1, fillColor: "#4A90E2", fillOpacity: 0.08, clickable: false }}
                 />
               )}
             </GoogleMap>

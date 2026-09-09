@@ -27,7 +27,7 @@ function markerState(row) {
   if (row.connectivity_status === "GPS_DISABLED" || row.connectivity_status === "INTERNET_DISCONNECTED") {
     return { tone: "warning", color: "#B1690F", label: "Connectivity issue" };
   }
-  if (row.current_work_area_name) return { tone: "inside", color: "#0F6E5C", label: "Inside workplace" };
+  if (row.current_work_area_name) return { tone: "inside", color: "#4A90E2", label: "Inside workplace" };
   return { tone: "outside", color: "#A8342B", label: "Outside workplace" };
 }
 
@@ -184,9 +184,9 @@ export default function Dashboard() {
                     key={wa.id}
                     paths={positions}
                     options={{
-                      strokeColor: wa.color || "#0F6E5C",
+                      strokeColor: wa.color || "#4A90E2",
                       strokeWeight: 1.5,
-                      fillColor: wa.color || "#0F6E5C",
+                      fillColor: wa.color || "#4A90E2",
                       fillOpacity: 0.1,
                     }}
                   />
@@ -227,7 +227,7 @@ export default function Dashboard() {
               LIVE WORKFORCE
             </div>
             <div className="map-legend-row">
-              <span className="map-legend-dot" style={{ background: "#0F6E5C" }} /> Inside
+              <span className="map-legend-dot" style={{ background: "#4A90E2" }} /> Inside
             </div>
             <div className="map-legend-row">
               <span className="map-legend-dot" style={{ background: "#B1690F" }} /> Near boundary / GPS issue
