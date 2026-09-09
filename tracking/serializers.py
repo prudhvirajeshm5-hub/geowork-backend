@@ -24,16 +24,23 @@ class EmployeeLiveStatusSerializer(serializers.ModelSerializer):
     is_online = serializers.BooleanField(read_only=True)
     connectivity_status = serializers.CharField(read_only=True)
     minutes_since_last_ping = serializers.IntegerField(read_only=True)
+    last_accuracy_tier = serializers.CharField(read_only=True)
+    # Surfaces an in-progress (not-yet-confirmed) geofence transition so a
+    # manager can tell "employee just stepped out a moment ago, still
+    # confirming" apart from a stale/wrong reading — V1.1 requirement #7/8.
+    pending_work_area_name = serializers.CharField(source="candidate_work_area.name", read_only=True, default=None)
+    pending_since = serializers.DateTimeField(source="candidate_since", read_only=True)
     shift_status = serializers.SerializerMethodField()
 
     class Meta:
         model = EmployeeLiveStatus
         fields = (
             "employee", "employee_name", "employee_code", "branch", "branch_name",
-            "last_latitude", "last_longitude", "last_accuracy_meters", "last_battery_level",
+            "last_latitude", "last_longitude", "last_accuracy_meters", "last_accuracy_tier", "last_battery_level",
             "gps_enabled", "network_connected", "last_ping_at", "is_online", "connectivity_status",
             "minutes_since_last_ping",
-            "current_work_area", "current_work_area_name", "shift_status", "updated_at",
+            "current_work_area", "current_work_area_name", "pending_work_area_name", "pending_since",
+            "shift_status", "updated_at",
         )
         read_only_fields = fields
 
@@ -45,11 +52,12 @@ class LocationPingSerializer(serializers.ModelSerializer):
     latitude = serializers.FloatField(read_only=True)
     longitude = serializers.FloatField(read_only=True)
     work_area_name = serializers.CharField(source="work_area.name", read_only=True, default=None)
+    accuracy_tier = serializers.CharField(source="accuracy_tier_value", read_only=True)
 
     class Meta:
         model = LocationPing
         fields = (
-            "id", "employee", "latitude", "longitude", "accuracy_meters", "battery_level",
+            "id", "employee", "latitude", "longitude", "accuracy_meters", "accuracy_tier", "battery_level",
             "gps_enabled", "network_connected", "work_area", "work_area_name",
             "recorded_at", "received_at",
         )

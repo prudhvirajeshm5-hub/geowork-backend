@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
-import api, { getTokens, setTokens } from "./api";
+import api, { getCachedUser, getTokens, setCachedUser, setTokens } from "./api";
 
 const AuthContext = createContext(null);
 
@@ -13,12 +13,35 @@ export function AuthProvider({ children }) {
       setLoading(false);
       return;
     }
+    // Optimistic: show the cached profile immediately so a reload doesn't
+    // bounce through a login-looking flash while /auth/me/ is in flight,
+    // and so a genuine network outage (see catch below) has something to
+    // fall back to instead of forcing a login.
+    const cached = getCachedUser();
+    if (cached) setUser(cached);
+
     try {
       const { data } = await api.get("/auth/me/");
       setUser(data);
-    } catch {
-      setTokens(null);
-      setUser(null);
+      setCachedUser(data, localStorage.getItem("geowork_tokens") != null);
+    } catch (error) {
+      // V1.1 fix: this used to clear tokens and force a login on ANY
+      // failure, including a plain network error with no server response
+      // at all. `api`'s interceptor already attempts a silent refresh on a
+      // real 401 and only lets it through if the refresh token itself was
+      // rejected — so by the time we get here, `error.response` present
+      // means "the server told us this session is genuinely invalid",
+      // while no response at all just means "couldn't reach the server
+      // right now". Only the former should log the user out.
+      if (error?.response) {
+        setTokens(null);
+        setUser(null);
+      } else if (!cached) {
+        // No cached profile to fall back on and no way to confirm the
+        // session either — leave tokens in place (don't force a login the
+        // user didn't ask for) but there's nothing to show as `user` yet.
+        setUser(null);
+      }
     } finally {
       setLoading(false);
     }
@@ -31,6 +54,7 @@ export function AuthProvider({ children }) {
   const login = async (phone, password, remember = true) => {
     const { data } = await api.post("/auth/login/", { phone, password });
     setTokens({ access: data.access, refresh: data.refresh }, remember);
+    setCachedUser(data.user, remember);
     setUser(data.user);
     return data.user;
   };
@@ -48,6 +72,7 @@ export function AuthProvider({ children }) {
 
   const refreshUser = async () => {
     const { data } = await api.get("/auth/me/");
+    setCachedUser(data, localStorage.getItem("geowork_tokens") != null);
     setUser(data);
     return data;
   };

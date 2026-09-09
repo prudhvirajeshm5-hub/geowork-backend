@@ -93,8 +93,16 @@ class WorkArea(models.Model):
             raise ValidationError("branch must belong to the same company as the work area.")
 
     def contains_point(self, latitude, longitude):
+        """
+        In-process check for a single already-fetched WorkArea (e.g. in the
+        admin or a test). Bulk lookups should use
+        `geofence.services.find_containing_work_area`, which runs `covers`
+        as a database query instead of fetching+testing in Python.
+        `covers` (not `contains`) so a point exactly on the boundary line
+        still counts as inside.
+        """
         point = Point(float(longitude), float(latitude), srid=4326)
-        return self.boundary.contains(point)
+        return self.boundary.covers(point)
 
 
 class WorkAreaAuditLog(models.Model):

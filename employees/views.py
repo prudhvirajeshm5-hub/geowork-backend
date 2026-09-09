@@ -1,7 +1,9 @@
-from rest_framework import status, viewsets
+from rest_framework import serializers, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
+from accounts.audit import log_action
+from accounts.models import AuditLog, OTP
 from accounts.permissions import IsManagerOrAdmin, ReadOnlyOrAdmin, company_scoped_queryset
 
 from . import services
@@ -14,6 +16,14 @@ from .serializers import (
     TransferDecisionSerializer,
     TransferRequestCreateSerializer,
 )
+
+
+class AdminResetPasswordRequestSerializer(serializers.Serializer):
+    # "send_link" (Option A, recommended): employee gets an OTP and sets
+    # their own new password through the existing forgot-password flow.
+    # "temporary_password" (Option B): admin gets a one-time temp password
+    # to relay out-of-band; the employee is forced to change it on next login.
+    mode = serializers.ChoiceField(choices=["send_link", "temporary_password"], default="send_link")
 
 
 class EmployeeViewSet(viewsets.ModelViewSet):
@@ -41,7 +51,7 @@ class EmployeeViewSet(viewsets.ModelViewSet):
         return EmployeeSerializer
 
     def get_permissions(self):
-        if self.action in ("create", "update", "partial_update", "destroy", "set_status"):
+        if self.action in ("create", "update", "partial_update", "destroy", "set_status", "reset_password"):
             return [IsManagerOrAdmin()]
         return [ReadOnlyOrAdmin()]
 
@@ -58,9 +68,63 @@ class EmployeeViewSet(viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
         if serializer.validated_data["action"] == "disable":
             employee.disable()
+            log_action(
+                AuditLog.Action.EMPLOYEE_DISABLED, performed_by=request.user, target_user=employee.user, request=request
+            )
         else:
             employee.enable()
+            log_action(
+                AuditLog.Action.EMPLOYEE_ENABLED, performed_by=request.user, target_user=employee.user, request=request
+            )
         return Response(EmployeeSerializer(employee, context={"request": request}).data)
+
+    @action(detail=True, methods=["post"], url_path="reset-password")
+    def reset_password(self, request, pk=None):
+        """
+        Employee Profile -> Security -> Reset Password (V1.1 admin/manager
+        password reset). The admin/manager never sees or sets the account's
+        real password directly for "send_link" mode; for "temporary_password"
+        mode they get a one-time value to relay to the employee, and the
+        employee is forced to change it before doing anything else.
+        """
+        from django.utils.crypto import get_random_string
+
+        from accounts.views import send_otp_sms
+
+        employee = self.get_object()
+        target_user = employee.user
+        serializer = AdminResetPasswordRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        mode = serializer.validated_data["mode"]
+
+        if mode == "send_link":
+            otp = OTP.objects.create(phone=target_user.phone, purpose=OTP.Purpose.RESET_PASSWORD)
+            send_otp_sms(target_user.phone, otp.code, OTP.Purpose.RESET_PASSWORD)
+            log_action(
+                AuditLog.Action.ADMIN_PASSWORD_RESET_INITIATED,
+                performed_by=request.user,
+                target_user=target_user,
+                request=request,
+                metadata={"mode": mode},
+            )
+            return Response({"detail": f"A password reset code has been sent to {target_user.phone}."})
+
+        # temporary_password mode — generated fresh every call, never
+        # derived from or able to reveal the existing (hashed) password.
+        temp_password = get_random_string(
+            length=10, allowed_chars="ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789"
+        )
+        target_user.set_password(temp_password)
+        target_user.must_change_password = True
+        target_user.save(update_fields=["password", "must_change_password"])
+        log_action(
+            AuditLog.Action.ADMIN_TEMP_PASSWORD_SET,
+            performed_by=request.user,
+            target_user=target_user,
+            request=request,
+            metadata={"mode": mode},
+        )
+        return Response({"temporary_password": temp_password})
 
     @action(detail=True, methods=["post"], url_path="transfer")
     def transfer(self, request, pk=None):

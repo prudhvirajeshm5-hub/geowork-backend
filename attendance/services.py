@@ -68,14 +68,40 @@ def _late_minutes(shift, check_in_dt):
 
 def _early_exit_minutes(shift, check_out_dt):
     """
-    Minutes early relative to shift.end_time. Night shifts (end_time on the
-    next calendar day) are out of scope for this calculation in V1 — flagged
-    in the model/README as a known gap for a future pass.
+    Minutes early relative to shift.end_time.
+
+    V1.1 fix: night shifts (`is_night_shift=True`, end_time on the next
+    calendar day — e.g. 22:00 -> 06:00) used to be skipped entirely, which
+    silently produced 0 for every early-exit/overtime calculation on those
+    shifts. Fixed by anchoring `scheduled_end` to the correct calendar day:
+    - Non-night shift: same day as the check-out.
+    - Night shift: if the check-out's local time-of-day is still "late" in
+      the sense of being >= the shift's start_time (i.e. check-out is
+      happening on the day the shift *started*, before midnight), the
+      scheduled end is the NEXT day. If the check-out's time-of-day is
+      already past midnight but before/at end_time (i.e. the employee is
+      checking out during the early-morning tail of the shift), the
+      scheduled end is the SAME day.
     """
-    if not shift or shift.is_night_shift:
+    if not shift:
         return 0
     local_dt = timezone.localtime(check_out_dt)
-    scheduled_end = datetime.datetime.combine(local_dt.date(), shift.end_time)
+    check_out_date = local_dt.date()
+    check_out_time = local_dt.time()
+
+    if shift.is_night_shift:
+        if check_out_time >= shift.start_time:
+            # Still on the "evening" side of the shift's start (e.g. 22:00
+            # start, checking out at 23:50) — the scheduled end is tomorrow.
+            end_date = check_out_date + datetime.timedelta(days=1)
+        else:
+            # Already past midnight (e.g. 05:30) — same calendar day as the
+            # scheduled end.
+            end_date = check_out_date
+    else:
+        end_date = check_out_date
+
+    scheduled_end = datetime.datetime.combine(end_date, shift.end_time)
     scheduled_end = timezone.make_aware(scheduled_end, local_dt.tzinfo) if timezone.is_naive(scheduled_end) else scheduled_end
     if local_dt >= scheduled_end:
         return 0

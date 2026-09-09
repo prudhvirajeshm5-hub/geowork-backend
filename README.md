@@ -91,11 +91,11 @@ this for platform administration.
   a daily beat schedule) creates an `ABSENT` record for any active employee
   with no attendance record on the given date. Safe to re-run — never double-marks.
 
-> **Known limitation, documented rather than hidden:** early-exit and late
-> calculations assume a same-day shift. Night shifts (`is_night_shift=True`,
-> where `end_time` falls on the next calendar day) are excluded from the
-> early-exit check for now — flagged here as a gap for a follow-up pass
-> rather than silently producing wrong numbers.
+> **V1.1 fix (previously a documented limitation):** early-exit/overtime
+> calculations now correctly handle night shifts (`is_night_shift=True`,
+> where `end_time` falls on the next calendar day) by anchoring the
+> scheduled end time to the correct calendar day instead of always using
+> the check-out's own date. See `attendance.services._early_exit_minutes`.
 
 ### Module 6 — Live Employee Tracking (`tracking` app)
 - **`POST /api/v1/tracking/ping/`** — the mobile app calls this periodically

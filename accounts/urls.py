@@ -14,6 +14,8 @@ urlpatterns = [
     path("password/reset/", views.ForgotPasswordConfirmView.as_view(), name="forgot-password-confirm"),
     path("token/refresh/", TokenRefreshView.as_view(), name="token-refresh"),
     path("logout/", views.LogoutView.as_view(), name="logout"),
+    path("logout/all/", views.LogoutAllDevicesView.as_view(), name="logout-all-devices"),
+    path("password/change/", views.ChangePasswordView.as_view(), name="change-password"),
     path("me/", views.MeView.as_view(), name="me"),
     path("device/", views.DeviceRegistrationView.as_view(), name="device-register"),
 ]

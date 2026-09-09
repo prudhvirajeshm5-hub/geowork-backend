@@ -9,8 +9,10 @@ from rest_framework.throttling import AnonRateThrottle
 from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from .models import Device, OTP, User
+from .audit import log_action
+from .models import AuditLog, Device, OTP, User
 from .serializers import (
+    ChangePasswordSerializer,
     DeviceSerializer,
     ForgotPasswordConfirmSerializer,
     OTPRequestSerializer,
@@ -110,9 +112,17 @@ class ForgotPasswordRequestView(APIView):
         serializer = OTPRequestSerializer(data=data)
         serializer.is_valid(raise_exception=True)
         phone = serializer.validated_data["phone"]
-        otp = OTP.objects.create(phone=phone, purpose=OTP.Purpose.RESET_PASSWORD)
-        send_otp_sms(phone, otp.code, OTP.Purpose.RESET_PASSWORD)
-        return Response({"detail": "Password reset OTP sent."})
+
+        # Deliberately the SAME response whether or not this phone has an
+        # account — only create/send the OTP if it does. Anything else
+        # (a distinct error message, a different status code) would let an
+        # attacker enumerate registered phone numbers through this form.
+        user = User.objects.filter(phone=phone).first()
+        if user is not None:
+            otp = OTP.objects.create(phone=phone, purpose=OTP.Purpose.RESET_PASSWORD)
+            send_otp_sms(phone, otp.code, OTP.Purpose.RESET_PASSWORD)
+            log_action(AuditLog.Action.PASSWORD_RESET_REQUESTED, target_user=user, request=request)
+        return Response({"detail": "If an account exists for this number, a reset code has been sent."})
 
 
 class ForgotPasswordConfirmView(APIView):
@@ -136,12 +146,17 @@ class ForgotPasswordConfirmView(APIView):
 
         user = User.objects.filter(phone=data["phone"]).first()
         if not user:
-            return Response({"detail": "No account found for this phone number."}, status=404)
+            # Same generic message as an invalid/expired code — never a
+            # distinct "no account" response (account-enumeration).
+            return Response({"detail": "Invalid or expired OTP."}, status=400)
 
         user.set_password(data["new_password"])
-        user.save(update_fields=["password"])
+        user.must_change_password = False
+        user.password_changed_at = timezone.now()
+        user.save(update_fields=["password", "must_change_password", "password_changed_at"])
         otp.is_used = True
         otp.save(update_fields=["is_used"])
+        log_action(AuditLog.Action.PASSWORD_RESET_COMPLETED, target_user=user, request=request)
         return Response({"detail": "Password reset successfully."})
 
 
@@ -160,6 +175,57 @@ class LogoutView(APIView):
         except Exception:
             return Response({"detail": "Invalid or already-expired token."}, status=400)
         return Response({"detail": "Logged out."})
+
+
+class ChangePasswordView(APIView):
+    """Profile -> Security -> Change Password. Requires the current password."""
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        serializer = ChangePasswordSerializer(data=request.data, context={"request": request})
+        serializer.is_valid(raise_exception=True)
+
+        user = request.user
+        user.set_password(serializer.validated_data["new_password"])
+        user.must_change_password = False
+        user.password_changed_at = timezone.now()
+        user.save(update_fields=["password", "must_change_password", "password_changed_at"])
+        log_action(AuditLog.Action.PASSWORD_CHANGED, performed_by=user, target_user=user, request=request)
+
+        # The current session's tokens are still valid on purpose (spec:
+        # "keep the current session active if security policy allows") —
+        # only an explicit logout-all-devices call revokes other sessions.
+        logout_others = bool(request.data.get("logout_other_devices"))
+        if logout_others:
+            _blacklist_all_outstanding_tokens(user)
+            log_action(AuditLog.Action.LOGOUT_ALL_DEVICES, performed_by=user, target_user=user, request=request)
+
+        return Response({"detail": "Password changed successfully."})
+
+
+def _blacklist_all_outstanding_tokens(user):
+    from rest_framework_simplejwt.token_blacklist.models import BlacklistedToken, OutstandingToken
+
+    for token in OutstandingToken.objects.filter(user=user):
+        BlacklistedToken.objects.get_or_create(token=token)
+
+
+class LogoutAllDevicesView(APIView):
+    """
+    Revokes every outstanding refresh token for the current user — the
+    device making this call included, since it has no way to distinguish
+    "this device" from "other devices" at the token-blacklist level. The
+    client should treat a successful call here the same as a normal logout
+    for itself, then require fresh credentials everywhere.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        _blacklist_all_outstanding_tokens(request.user)
+        log_action(AuditLog.Action.LOGOUT_ALL_DEVICES, performed_by=request.user, target_user=request.user, request=request)
+        return Response({"detail": "Logged out from all devices."})
 
 
 class MeView(RetrieveUpdateAPIView):

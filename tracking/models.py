@@ -41,6 +41,31 @@ class ShiftLiveStatus(models.TextChoices):
     ABSENT = "ABSENT", "Absent"
 
 
+class GpsAccuracyTier(models.TextChoices):
+    HIGH = "HIGH", "High accuracy"
+    NORMAL = "NORMAL", "Normal accuracy"
+    LOW = "LOW", "Low accuracy"
+
+
+def accuracy_tier(accuracy_meters):
+    """
+    V1.1 requirement #8. `None` (device didn't report accuracy) is treated
+    as LOW — i.e. "don't trust this reading for boundary decisions" rather
+    than assuming the best case.
+    """
+    if accuracy_meters is None:
+        return GpsAccuracyTier.LOW
+    from django.conf import settings as _settings
+
+    high = getattr(_settings, "GPS_ACCURACY_HIGH_METERS", 20)
+    normal = getattr(_settings, "GPS_ACCURACY_NORMAL_METERS", 50)
+    if accuracy_meters <= high:
+        return GpsAccuracyTier.HIGH
+    if accuracy_meters <= normal:
+        return GpsAccuracyTier.NORMAL
+    return GpsAccuracyTier.LOW
+
+
 class LocationPing(models.Model):
     employee = models.ForeignKey(Employee, on_delete=models.CASCADE, related_name="location_pings")
     company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name="location_pings")
@@ -79,6 +104,10 @@ class LocationPing(models.Model):
     def longitude(self):
         return self.location.x
 
+    @property
+    def accuracy_tier_value(self):
+        return accuracy_tier(self.accuracy_meters)
+
 
 class EmployeeLiveStatus(models.Model):
     employee = models.OneToOneField(Employee, on_delete=models.CASCADE, related_name="live_status")
@@ -92,9 +121,23 @@ class EmployeeLiveStatus(models.Model):
     network_connected = models.BooleanField(default=True)
     last_ping_at = models.DateTimeField(null=True, blank=True)
 
+    # CONFIRMED work-area membership — this is what attendance, the live
+    # dashboard, and notifications all key off. Only changes once a
+    # candidate has held steady for its debounce window (see
+    # tracking.services.process_ping and V1.1 requirement #7).
     current_work_area = models.ForeignKey(
         WorkArea, on_delete=models.SET_NULL, null=True, blank=True, related_name="employees_currently_here"
     )
+
+    # Debounce state: the work area (or None, for "outside everything")
+    # the last several pings have suggested, if it differs from
+    # `current_work_area`, and since when. Cleared once confirmed (folded
+    # into current_work_area) or once a ping matches current_work_area
+    # again (the candidate was just GPS jitter).
+    candidate_work_area = models.ForeignKey(
+        WorkArea, on_delete=models.SET_NULL, null=True, blank=True, related_name="employees_pending_here"
+    )
+    candidate_since = models.DateTimeField(null=True, blank=True)
 
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -136,6 +179,12 @@ class EmployeeLiveStatus(models.Model):
         if not self.network_connected:
             return ConnectivityStatus.INTERNET_DISCONNECTED
         return ConnectivityStatus.ONLINE
+
+    @property
+    def last_accuracy_tier(self):
+        """HIGH / NORMAL / LOW — lets a manager see *why* a location or a
+        pending geofence transition might be uncertain (V1.1 requirement #8)."""
+        return accuracy_tier(self.last_accuracy_meters)
 
     @property
     def last_latitude(self):

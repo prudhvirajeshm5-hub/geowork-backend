@@ -154,7 +154,7 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 # ---------------------------------------------------------------------------
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
-        "rest_framework_simplejwt.authentication.JWTAuthentication",
+        "accounts.authentication.ForcePasswordChangeJWTAuthentication",
     ),
     "DEFAULT_PERMISSION_CLASSES": (
         "rest_framework.permissions.IsAuthenticated",
@@ -195,6 +195,24 @@ OTP_MAX_ATTEMPTS = 5
 
 CELERY_BROKER_URL = config("REDIS_URL", default="redis://localhost:6379/0")
 CELERY_RESULT_BACKEND = config("REDIS_URL", default="redis://localhost:6379/0")
+
+# Geofence debounce (V1.1 requirement #7) — a single noisy GPS reading must
+# not flip attendance state. An ENTER is only confirmed once the employee
+# has looked like they're inside continuously for this long; an EXIT only
+# once they've looked like they're outside continuously for this long.
+# Company/work-area-specific overrides can be layered on later; these are
+# the global defaults for now.
+GEOFENCE_ENTRY_DEBOUNCE_SECONDS = config("GEOFENCE_ENTRY_DEBOUNCE_SECONDS", default=45, cast=int)
+GEOFENCE_EXIT_DEBOUNCE_SECONDS = config("GEOFENCE_EXIT_DEBOUNCE_SECONDS", default=180, cast=int)
+
+# GPS accuracy tiers (V1.1 requirement #8), in meters. A ping is HIGH
+# accuracy at or below the first threshold, NORMAL up to the second, and
+# LOW above it. Poor-accuracy pings still count toward geofence membership
+# (rejecting them outright would create its own false exits in areas with
+# bad signal) but are surfaced to managers as uncertain rather than acted
+# on for immediate boundary crossings — see tracking.services.
+GPS_ACCURACY_HIGH_METERS = config("GPS_ACCURACY_HIGH_METERS", default=20, cast=int)
+GPS_ACCURACY_NORMAL_METERS = config("GPS_ACCURACY_NORMAL_METERS", default=50, cast=int)
 
 # Live tracking (Module 6)
 LIVE_TRACKING_ONLINE_THRESHOLD_MINUTES = config("LIVE_TRACKING_ONLINE_THRESHOLD_MINUTES", default=5, cast=int)

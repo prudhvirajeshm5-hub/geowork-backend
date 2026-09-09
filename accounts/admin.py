@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as DjangoUserAdmin
 
-from .models import Device, OTP, User
+from .models import AuditLog, Device, OTP, User
 
 
 @admin.register(User)
@@ -36,3 +36,14 @@ class DeviceAdmin(admin.ModelAdmin):
     list_display = ("user", "device_id", "platform", "is_active", "registered_at", "last_seen_at")
     list_filter = ("platform", "is_active")
     search_fields = ("user__phone", "device_id")
+
+
+@admin.register(AuditLog)
+class AuditLogAdmin(admin.ModelAdmin):
+    list_display = ("action", "performed_by", "target_user", "company", "ip_address", "created_at")
+    list_filter = ("action", "company")
+    search_fields = ("performed_by__phone", "target_user__phone", "ip_address")
+    readonly_fields = ("action", "performed_by", "target_user", "company", "ip_address", "metadata", "created_at")
+
+    def has_add_permission(self, request):
+        return False

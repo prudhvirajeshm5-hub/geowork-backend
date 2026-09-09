@@ -27,9 +27,11 @@ class UserSerializer(serializers.ModelSerializer):
         fields = (
             "id", "phone", "email", "first_name", "last_name", "full_name",
             "role", "company", "is_active", "is_phone_verified", "date_joined",
-            "has_employee_profile",
+            "has_employee_profile", "must_change_password",
         )
-        read_only_fields = ("id", "role", "company", "is_active", "date_joined", "is_phone_verified")
+        read_only_fields = (
+            "id", "role", "company", "is_active", "date_joined", "is_phone_verified", "must_change_password",
+        )
 
     def get_has_employee_profile(self, obj):
         return hasattr(obj, "employee_profile") and obj.employee_profile is not None
@@ -77,8 +79,13 @@ class OTPRequestSerializer(serializers.Serializer):
 
     def validate_phone(self, value):
         purpose = self.initial_data.get("purpose", OTP.Purpose.LOGIN)
-        exists = User.objects.filter(phone=value).exists()
-        if purpose in (OTP.Purpose.LOGIN, OTP.Purpose.RESET_PASSWORD) and not exists:
+        # RESET_PASSWORD deliberately does NOT raise here even when no
+        # account exists — doing so would let an attacker enumerate valid
+        # phone numbers via the forgot-password form (V1.1 security
+        # requirement: "Do not expose whether a particular account exists").
+        # ForgotPasswordRequestView checks existence itself, silently, and
+        # always returns the same success response either way.
+        if purpose == OTP.Purpose.LOGIN and not User.objects.filter(phone=value).exists():
             raise serializers.ValidationError("No account found with this phone number.")
         return value
 
@@ -114,6 +121,36 @@ class ForgotPasswordConfirmSerializer(serializers.Serializer):
     phone = serializers.CharField()
     code = serializers.CharField()
     new_password = serializers.CharField(write_only=True, validators=[validate_password])
+
+
+class ChangePasswordSerializer(serializers.Serializer):
+    """Self-service change-password: requires proving the current password."""
+
+    current_password = serializers.CharField(write_only=True)
+    new_password = serializers.CharField(write_only=True, validators=[validate_password])
+    confirm_password = serializers.CharField(write_only=True)
+
+    def validate_current_password(self, value):
+        user = self.context["request"].user
+        if not user.check_password(value):
+            raise serializers.ValidationError("Current password is incorrect.")
+        return value
+
+    def validate(self, attrs):
+        if attrs["new_password"] != attrs["confirm_password"]:
+            raise serializers.ValidationError({"confirm_password": "Passwords do not match."})
+        return attrs
+
+
+class AdminSetTemporaryPasswordSerializer(serializers.Serializer):
+    """
+    Admin/manager "Option B" reset: caller never sees or sets the real
+    plaintext, they only get back the ONE-TIME temporary password shown to
+    them here so they can relay it to the employee out-of-band. It is never
+    retrievable again after this response.
+    """
+
+    temporary_password = serializers.CharField(read_only=True)
 
 
 class DeviceSerializer(serializers.ModelSerializer):

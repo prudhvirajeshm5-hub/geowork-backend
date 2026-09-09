@@ -73,7 +73,9 @@ class WorkAreaViewSet(viewsets.ModelViewSet):
         data = serializer.validated_data
 
         point = Point(data["longitude"], data["latitude"], srid=4326)
-        qs = self.get_queryset().filter(is_active=True, boundary__contains=point)
+        # `covers` (not `contains`) so a point exactly on the boundary line
+        # counts as inside — matches geofence.services.find_containing_work_area.
+        qs = self.get_queryset().filter(is_active=True, boundary__covers=point)
         if data.get("branch"):
             qs = qs.filter(branch=data["branch"])
 

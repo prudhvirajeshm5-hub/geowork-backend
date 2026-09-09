@@ -42,6 +42,11 @@ class User(AbstractBaseUser, PermissionsMixin):
     is_phone_verified = models.BooleanField(default=False)
     date_joined = models.DateTimeField(default=timezone.now)
     last_login_ip = models.GenericIPAddressField(null=True, blank=True)
+    # Set when an admin issues a temporary password (V1.1 Admin Password
+    # Reset, Option B). Forces a password change on next login before any
+    # other endpoint is usable — see accounts.permissions.MustChangePassword.
+    must_change_password = models.BooleanField(default=False)
+    password_changed_at = models.DateTimeField(null=True, blank=True)
 
     objects = UserManager()
 
@@ -122,3 +127,51 @@ class Device(models.Model):
 
     def __str__(self):
         return f"{self.user.phone} - {self.device_id} ({self.platform})"
+
+
+class AuditLog(models.Model):
+    """
+    Platform-wide security audit trail (V1.1 requirement #16), shared across
+    apps so "who did what security-sensitive thing, when" lives in one place
+    instead of being scattered/duplicated per-module. Modules that already
+    have their own domain-specific audit log (e.g. geofence.WorkAreaAuditLog)
+    keep that one for domain detail and ALSO write a summary row here so a
+    single query answers "show me all security events for this company".
+    """
+
+    class Action(models.TextChoices):
+        PASSWORD_CHANGED = "PASSWORD_CHANGED", "Password changed (self-service)"
+        PASSWORD_RESET_REQUESTED = "PASSWORD_RESET_REQUESTED", "Password reset requested"
+        PASSWORD_RESET_COMPLETED = "PASSWORD_RESET_COMPLETED", "Password reset completed"
+        ADMIN_PASSWORD_RESET_INITIATED = "ADMIN_PASSWORD_RESET_INITIATED", "Admin-initiated password reset"
+        ADMIN_TEMP_PASSWORD_SET = "ADMIN_TEMP_PASSWORD_SET", "Admin set a temporary password"
+        LOGOUT_ALL_DEVICES = "LOGOUT_ALL_DEVICES", "Logged out from all devices"
+        EMPLOYEE_DISABLED = "EMPLOYEE_DISABLED", "Employee disabled"
+        EMPLOYEE_ENABLED = "EMPLOYEE_ENABLED", "Employee enabled"
+        ATTENDANCE_MANUALLY_EDITED = "ATTENDANCE_MANUALLY_EDITED", "Attendance record manually edited"
+        GEOFENCE_CREATED = "GEOFENCE_CREATED", "Geofence created"
+        GEOFENCE_UPDATED = "GEOFENCE_UPDATED", "Geofence updated"
+        GEOFENCE_DELETED = "GEOFENCE_DELETED", "Geofence deleted"
+
+    company = models.ForeignKey(
+        "companies.Company", on_delete=models.CASCADE, null=True, blank=True, related_name="audit_logs"
+    )
+    # The user the action was performed ON (e.g. the employee whose password
+    # was reset). Null for actions with no single target (e.g. self logout).
+    target_user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="audit_logs_about_me"
+    )
+    performed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="audit_logs_performed"
+    )
+    action = models.CharField(max_length=40, choices=Action.choices)
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    metadata = models.JSONField(default=dict, blank=True, help_text="Previous/new values or other action-specific detail")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [models.Index(fields=["company", "-created_at"]), models.Index(fields=["target_user", "-created_at"])]
+
+    def __str__(self):
+        return f"{self.action} by {self.performed_by} @ {self.created_at}"

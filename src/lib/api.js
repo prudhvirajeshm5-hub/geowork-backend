@@ -3,6 +3,7 @@ import axios from "axios";
 export const BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api/v1";
 
 const TOKENS_KEY = "geowork_tokens";
+const USER_CACHE_KEY = "geowork_cached_user";
 
 export function getTokens() {
   const raw = localStorage.getItem(TOKENS_KEY) || sessionStorage.getItem(TOKENS_KEY);
@@ -19,6 +20,31 @@ export function setTokens(tokens, remember = true) {
   sessionStorage.removeItem(TOKENS_KEY);
   if (tokens) {
     (remember ? localStorage : sessionStorage).setItem(TOKENS_KEY, JSON.stringify(tokens));
+  } else {
+    // Tokens gone means the cached profile is stale too — never leave it
+    // behind for a subsequent login on the same browser to pick up.
+    localStorage.removeItem(USER_CACHE_KEY);
+    sessionStorage.removeItem(USER_CACHE_KEY);
+  }
+}
+
+/**
+ * Best-effort last-known profile, used only so a page reload with no
+ * network connectivity doesn't force a login the user has no reason to
+ * expect (V1.1: "do not log out simply because of temporary network
+ * loss"). Never authoritative — every real permission check happens
+ * server-side on each request.
+ */
+export function getCachedUser() {
+  const raw = localStorage.getItem(USER_CACHE_KEY) || sessionStorage.getItem(USER_CACHE_KEY);
+  return raw ? JSON.parse(raw) : null;
+}
+
+export function setCachedUser(user, remember = true) {
+  localStorage.removeItem(USER_CACHE_KEY);
+  sessionStorage.removeItem(USER_CACHE_KEY);
+  if (user) {
+    (remember ? localStorage : sessionStorage).setItem(USER_CACHE_KEY, JSON.stringify(user));
   }
 }
 
@@ -58,9 +84,17 @@ api.interceptors.response.use(
             });
         }
         const data = await refreshInFlight;
-        // Refresh must not silently upgrade a session-only login into a persisted one.
+        // ROTATE_REFRESH_TOKENS=True on the backend: every refresh call
+        // blacklists the old refresh token and issues a new one. The old
+        // React code only ever stored the new `access` token and kept the
+        // now-blacklisted refresh token — harmless for the first refresh,
+        // but the *second* time the access token expired, refreshing with
+        // that stale refresh token would fail and force a login the user
+        // had no reason to expect ("logged out randomly"). Must always
+        // persist whatever refresh token comes back, falling back to the
+        // existing one only if the backend didn't rotate for some reason.
         const remembered = localStorage.getItem(TOKENS_KEY) != null;
-        setTokens({ ...tokens, access: data.access }, remembered);
+        setTokens({ access: data.access, refresh: data.refresh || tokens.refresh }, remembered);
         config.headers.Authorization = `Bearer ${data.access}`;
         return api(config);
       } catch (refreshError) {
