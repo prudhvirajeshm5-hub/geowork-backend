@@ -5,6 +5,10 @@ from django.urls import include, path
 
 from .console_view import serve_console
 
+admin.site.site_header = "Miracle 5 Administration"
+admin.site.site_title = "Miracle 5 Admin"
+admin.site.index_title = "Miracle 5"
+
 urlpatterns = [
     path("admin/", admin.site.urls),
     path("console/", serve_console, name="ops-console"),
