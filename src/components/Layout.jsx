@@ -38,11 +38,9 @@ export default function Layout() {
     <div className="app-shell">
       <aside className="sidebar">
         <div className="sidebar-brand">
-          <span className="sidebar-brand-mark">
-            <Hexagon size={16} color="#eaf3ef" strokeWidth={2.2} />
-          </span>
+          <img src="/miracle5-logo.png" alt="Miracle 5" className="sidebar-brand-mark" style={{ width: 32, height: 32, objectFit: "contain" }} />
           <div>
-            <div className="sidebar-brand-name">GeoWork Pro</div>
+            <div className="sidebar-brand-name">Miracle 5</div>
             <div className="sidebar-brand-sub">ADMIN PORTAL</div>
           </div>
         </div>

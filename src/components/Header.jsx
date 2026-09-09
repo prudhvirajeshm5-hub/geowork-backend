@@ -27,7 +27,7 @@ export default function Header() {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef(null);
 
-  const title = TITLES[location.pathname] || "GeoWork Pro";
+  const title = TITLES[location.pathname] || "Miracle 5";
 
   useEffect(() => {
     let cancelled = false;

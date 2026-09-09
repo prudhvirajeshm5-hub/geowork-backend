@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { Hexagon, ArrowRight, Eye, EyeOff } from "lucide-react";
+import { ArrowRight, Eye, EyeOff } from "lucide-react";
 import { useAuth } from "../lib/auth";
 import { apiErrorMessage } from "../lib/api";
 import { Alert } from "../components/ui";
@@ -23,7 +23,7 @@ export default function Login() {
     try {
       const user = await login(phone.trim(), password, remember);
       if (user.role === "EMPLOYEE") {
-        setError("This portal is built for managers and admins. Use the GeoWork Pro mobile app to check in and out.");
+        setError("This portal is built for managers and admins. Use the Miracle 5 mobile app to check in and out.");
         setSubmitting(false);
         return;
       }
@@ -43,12 +43,12 @@ export default function Login() {
             <polygon
               points="210,40 360,140 330,340 90,340 60,140"
               fill="none"
-              stroke="#7fd6bb"
+              stroke="#93c44f"
               strokeWidth="2"
               strokeDasharray="7 6"
               className="geofence-path"
             />
-            <polygon points="210,40 360,140 330,340 90,340 60,140" fill="#0f6e5c" fillOpacity="0.08" />
+            <polygon points="210,40 360,140 330,340 90,340 60,140" fill="#2c3a56" fillOpacity="0.08" />
             {[
               [210, 40],
               [360, 140],
@@ -66,7 +66,7 @@ export default function Login() {
           </svg>
           <h2>Every check-in starts at a boundary.</h2>
           <p>
-            GeoWork Pro watches the perimeter so you don't have to — geofenced attendance, live field
+            Miracle 5 watches the perimeter so you don't have to — geofenced attendance, live field
             visibility, and reporting in one console.
           </p>
         </div>
@@ -75,11 +75,9 @@ export default function Login() {
       <div className="login-form-col">
         <form className="login-card" onSubmit={handleSubmit}>
           <div className="login-brand">
-            <span className="sidebar-brand-mark">
-              <Hexagon size={16} color="#eaf3ef" strokeWidth={2.2} />
-            </span>
+            <img src="/miracle5-logo.png" alt="Miracle 5" className="sidebar-brand-mark" style={{ width: 32, height: 32, objectFit: "contain" }} />
             <div>
-              <div className="login-brand-name">GeoWork Pro</div>
+              <div className="login-brand-name">Miracle 5</div>
               <div className="login-brand-sub">Admin Portal</div>
             </div>
           </div>
