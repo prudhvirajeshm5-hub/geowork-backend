@@ -1,0 +1,9 @@
+venv/
+venv312/
+.env
+__pycache__/
+*.pyc
+node_modules/
+*_backup_*/
+media/
+staticfiles/
