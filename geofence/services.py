@@ -39,3 +39,34 @@ def find_containing_work_area(company_id, latitude, longitude, branch_id=None):
     if branch_id:
         qs = qs.filter(branch_id=branch_id)
     return qs.first()
+
+
+def find_containing_work_area_with_tolerance(company_id, latitude, longitude, accuracy_meters=None, branch_id=None):
+    """Strict match first. If nothing contains the point, accept an area when the
+    reading is within the phone's reported GPS accuracy of the boundary, capped by
+    GEOFENCE_MAX_ACCURACY_TOLERANCE_M (default 30 m). This stops a reading that is
+    10 m off the edge, on a 10 m accuracy fix, from being marked outside."""
+    import math
+    from django.conf import settings as dj_settings
+
+    area = find_containing_work_area(company_id, latitude, longitude, branch_id=branch_id)
+    if area is not None:
+        return area
+
+    cap = float(getattr(dj_settings, "GEOFENCE_MAX_ACCURACY_TOLERANCE_M", 30))
+    tolerance = min(max(float(accuracy_meters or 0), 0.0), cap)
+    if tolerance <= 0:
+        return None
+
+    point = Point(float(longitude), float(latitude), srid=4326).transform(3857, clone=True)
+    cos_lat = math.cos(math.radians(float(latitude)))
+    candidates = WorkArea.objects.filter(company_id=company_id, is_active=True)
+    if branch_id:
+        candidates = candidates.filter(branch_id=branch_id)
+    for area in candidates.order_by("id"):
+        boundary_m = area.boundary.transform(3857, clone=True)
+        # Web Mercator distances are stretched by 1/cos(lat); convert back to true metres.
+        true_metres = boundary_m.distance(point) * cos_lat
+        if true_metres <= tolerance:
+            return area
+    return None

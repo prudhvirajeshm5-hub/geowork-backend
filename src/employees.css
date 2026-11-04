@@ -1,0 +1,101 @@
+
+/* Employees page (matches the GeoWork Pro employee management design). */
+.emp-module { font-size: 12px; font-weight: 600; letter-spacing: 0.04em; color: var(--brand); margin-bottom: 6px; }
+.emp-stats {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 14px;
+  margin: 18px 0;
+}
+.emp-stat {
+  background: #fff;
+  border: 1px solid #e6ebf3;
+  border-radius: 16px;
+  padding: 16px;
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  box-shadow: var(--shadow-sm);
+}
+.emp-stat-body { flex: 1; min-width: 0; }
+.emp-stat-icon {
+  width: 42px; height: 42px; border-radius: 12px;
+  display: grid; place-items: center; flex: none;
+}
+.emp-stat-label { font-size: 13px; color: var(--ink-soft); }
+.emp-stat-value { font-size: 26px; font-weight: 800; color: var(--ink); line-height: 1.15; }
+.emp-stat-pct { font-size: 12px; margin-top: 2px; }
+.emp-bar { height: 4px; border-radius: 4px; background: #eef2f8; margin-top: 8px; overflow: hidden; }
+.emp-bar span { display: block; height: 100%; border-radius: 4px; }
+.emp-tone-blue { background: #e8f0fd; color: #2f6fd0; }
+.emp-tone-green { background: #e6f5ed; color: #1e8e5a; }
+.emp-tone-amber { background: #fdf3e1; color: #b86f10; }
+.emp-tone-red { background: #fdecea; color: #d64541; }
+.emp-text-blue { color: #2f6fd0; }
+.emp-text-green { color: #1e8e5a; }
+.emp-text-red { color: #d64541; }
+
+.emp-head-actions { display: flex; gap: 10px; }
+.emp-add { gap: 8px; padding-right: 8px; }
+.emp-add-caret {
+  margin-left: 6px; padding-left: 8px; border-left: 1px solid rgba(255,255,255,0.35);
+  display: inline-flex; align-items: center;
+}
+
+.emp-card { padding: 16px; }
+.emp-filters {
+  display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 14px;
+}
+.emp-search {
+  flex: 1 1 240px; display: flex; align-items: center; gap: 8px;
+  border: 1px solid #d7deea; border-radius: var(--radius); padding: 0 12px; height: 40px; background: #fff;
+  color: var(--ink-faint);
+}
+.emp-search input { border: none; outline: none; flex: 1; font-size: 14px; background: transparent; }
+.emp-filters select.input { width: auto; min-width: 150px; height: 40px; }
+.emp-clear { height: 40px; }
+.emp-export { height: 40px; gap: 8px; }
+
+.emp-table th { font-size: 12px; text-transform: uppercase; letter-spacing: 0.03em; }
+.emp-name { display: flex; align-items: center; gap: 12px; }
+.emp-avatar {
+  width: 36px; height: 36px; border-radius: 50%;
+  background: #14284b; color: #fff; font-size: 12px; font-weight: 700;
+  display: inline-grid; place-items: center; flex: none;
+}
+.emp-sub { font-size: 12px; color: var(--ink-faint); }
+.emp-pill {
+  display: inline-block; padding: 4px 12px; border-radius: 999px; font-size: 12px; font-weight: 600;
+}
+.emp-pill-green { background: #e6f5ed; color: #1e8e5a; }
+.emp-pill-blue { background: #e8f0fd; color: #2f6fd0; }
+.emp-pill-slate { background: #eceff5; color: #5b6680; }
+.emp-last { display: flex; gap: 8px; align-items: flex-start; font-size: 13px; }
+.emp-dot { width: 8px; height: 8px; border-radius: 50%; margin-top: 5px; flex: none; }
+.emp-dot.on { background: #1e8e5a; }
+.emp-dot.off { background: #9aa4b8; }
+.emp-actions { display: flex; gap: 6px; }
+.emp-action {
+  width: 34px; height: 34px; border-radius: 10px; border: 1px solid #d7deea; background: #fff;
+  display: inline-grid; place-items: center; cursor: pointer; color: var(--ink-soft);
+}
+.emp-action:hover { background: #f5f8fc; }
+
+.emp-footer {
+  display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;
+  gap: 12px; margin-top: 14px;
+}
+.emp-pager { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.emp-pg {
+  min-width: 34px; height: 34px; padding: 0 8px; border-radius: 10px; border: 1px solid #d7deea;
+  background: #fff; color: var(--ink-soft); font-size: 13px; cursor: pointer;
+  display: inline-grid; place-items: center;
+}
+.emp-pg:disabled { opacity: 0.45; cursor: default; }
+.emp-pg.on { background: #14284b; border-color: #14284b; color: #fff; }
+.emp-ellipsis { padding: 0 4px; color: var(--ink-faint); }
+.emp-size { width: auto; min-width: 110px; height: 34px; margin-left: 8px; }
+
+@media (max-width: 1200px) {
+  .emp-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}

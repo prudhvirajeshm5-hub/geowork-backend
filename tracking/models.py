@@ -67,6 +67,7 @@ def accuracy_tier(accuracy_meters):
 
 
 class LocationPing(models.Model):
+    event_id = models.UUIDField(null=True, blank=True, unique=True)
     employee = models.ForeignKey(Employee, on_delete=models.CASCADE, related_name="location_pings")
     company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name="location_pings")
 
@@ -110,6 +111,7 @@ class LocationPing(models.Model):
 
 
 class EmployeeLiveStatus(models.Model):
+    
     employee = models.OneToOneField(Employee, on_delete=models.CASCADE, related_name="live_status")
     company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name="employee_live_statuses")
     branch = models.ForeignKey(Branch, on_delete=models.SET_NULL, null=True, blank=True)
@@ -120,6 +122,7 @@ class EmployeeLiveStatus(models.Model):
     gps_enabled = models.BooleanField(default=True)
     network_connected = models.BooleanField(default=True)
     last_ping_at = models.DateTimeField(null=True, blank=True)
+    last_contact_at = models.DateTimeField(null=True, blank=True, db_index=True)
 
     # CONFIRMED work-area membership — this is what attendance, the live
     # dashboard, and notifications all key off. Only changes once a
@@ -150,10 +153,19 @@ class EmployeeLiveStatus(models.Model):
         return f"{self.employee.employee_code} live status"
 
     @property
-    def is_online(self):
+    def is_location_fresh(self):
+        """True only when a real location arrived recently."""
         if not self.last_ping_at:
             return False
         return (timezone.now() - self.last_ping_at) <= timezone.timedelta(minutes=ONLINE_THRESHOLD_MINUTES)
+
+    @property
+    def is_online(self):
+        """True when the phone has contacted the server recently (location or heartbeat)."""
+        last_seen = self.last_contact_at or self.last_ping_at
+        if not last_seen:
+            return False
+        return (timezone.now() - last_seen) <= timezone.timedelta(minutes=ONLINE_THRESHOLD_MINUTES)
 
     @property
     def minutes_since_last_ping(self):
@@ -178,6 +190,9 @@ class EmployeeLiveStatus(models.Model):
             return ConnectivityStatus.GPS_DISABLED
         if not self.network_connected:
             return ConnectivityStatus.INTERNET_DISCONNECTED
+        if not self.is_location_fresh:
+            # The phone is reachable, but no location has arrived. Never show Live.
+            return ConnectivityStatus.OFFLINE
         return ConnectivityStatus.ONLINE
 
     @property

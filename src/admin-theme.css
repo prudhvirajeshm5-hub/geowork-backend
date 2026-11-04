@@ -1,0 +1,135 @@
+/* ==========================================================================
+   GeoWork Pro admin theme. Loaded after index.css, so it overrides the
+   shared tokens and component rules for every admin page.
+   ========================================================================== */
+
+:root {
+  --ink: #18223a;
+  --ink-soft: #4a5570;
+  --ink-faint: #8a94a8;
+
+  --paper: #f3f6fb;
+  --panel: #ffffff;
+  --panel-sunken: #eef2f8;
+  --line: #e3e8f0;
+  --line-strong: #cfd7e3;
+
+  --brand: #1e8e5a;
+  --brand-dark: #15704a;
+  --brand-soft: #e6f5ed;
+  --brand-line: #8fd0ae;
+
+  --amber: #b86f10;
+  --amber-soft: #fdf3e1;
+  --red: #d64541;
+  --red-soft: #fdecea;
+  --blue: #2f6fd0;
+  --blue-soft: #e8f0fd;
+  --slate: #5b6680;
+  --slate-soft: #eceff5;
+
+  --radius-sm: 8px;
+  --radius: 12px;
+  --radius-lg: 18px;
+
+  --shadow-sm: 0 1px 2px rgba(20, 40, 75, 0.05);
+  --shadow: 0 4px 14px rgba(20, 40, 75, 0.07);
+}
+
+body {
+  background: var(--paper);
+}
+
+/* Sidebar: navy, like the design */
+.sidebar {
+  background: #14284b !important;
+  border-right: none;
+}
+.sidebar-brand-name {
+  color: #ffffff;
+}
+.sidebar-brand-sub {
+  color: #9db0d0;
+}
+.sidebar-brand-mark {
+  background: #1e8e5a;
+}
+.sidebar-link {
+  color: #c9d4e8;
+  border-radius: 10px;
+}
+.sidebar-link:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: #ffffff;
+}
+.sidebar-link.active {
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+}
+.sidebar-link.active::before {
+  display: none;
+}
+.sidebar-avatar {
+  background: #1e8e5a;
+  color: #ffffff;
+}
+.sidebar-user-name {
+  color: #ffffff;
+}
+.sidebar-user-role,
+.sidebar-logout {
+  color: #9db0d0;
+}
+
+/* Page heading */
+.page-head h1 {
+  font-weight: 800;
+  color: var(--ink);
+}
+
+/* Cards */
+.card {
+  border-radius: var(--radius-lg);
+  border: 1px solid #e6ebf3;
+  box-shadow: var(--shadow-sm);
+}
+.card-head {
+  border-bottom: 1px solid #eef2f8;
+}
+
+/* Buttons */
+.btn-primary {
+  background: var(--brand);
+  border-color: var(--brand);
+  color: #ffffff;
+  border-radius: var(--radius);
+}
+.btn-primary:hover {
+  background: var(--brand-dark);
+  border-color: var(--brand-dark);
+}
+
+/* Inputs */
+.input {
+  border-radius: var(--radius);
+  border-color: #d7deea;
+}
+.input:focus {
+  border-color: var(--brand);
+}
+
+/* Tables */
+table.data th {
+  background: #f6f8fb;
+  color: var(--ink-soft);
+  font-weight: 600;
+}
+table.data tbody tr:hover {
+  background: #f8fbff;
+}
+
+/* Stat cards */
+.stat-card {
+  border-radius: var(--radius-lg);
+  border: 1px solid #e6ebf3;
+}

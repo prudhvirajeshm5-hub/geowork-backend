@@ -9,6 +9,11 @@ from companies.models import Branch, Department, Designation, ShiftTiming
 from .models import Employee, EmployeeTransferRequest
 
 
+def _is_company_admin(request):
+    user = getattr(request, "user", None)
+    return bool(user and user.is_authenticated and (user.is_superuser or user.role == Role.ADMIN))
+
+
 class EmployeeSerializer(serializers.ModelSerializer):
     """Read/update serializer — org-structure and HR-profile fields only."""
 
@@ -20,11 +25,17 @@ class EmployeeSerializer(serializers.ModelSerializer):
         fields = (
             "id", "user", "company", "employee_code", "branch", "department",
             "designation", "shift", "manager", "manager_name", "photo",
-            "date_of_joining", "date_of_exit", "address",
+            "date_of_joining", "date_of_exit", "address", "monthly_salary",
             "emergency_contact_name", "emergency_contact_phone", "status",
             "created_at", "updated_at",
         )
         read_only_fields = ("id", "company", "status", "created_at", "updated_at")
+
+    def get_fields(self):
+        fields = super().get_fields()
+        if not _is_company_admin(self.context.get("request")):
+            fields.pop("monthly_salary", None)  # salaries are admin-only
+        return fields
 
     def validate(self, attrs):
         company = self.instance.company if self.instance else self.context["request"].user.company

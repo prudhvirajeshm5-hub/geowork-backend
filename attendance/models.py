@@ -59,6 +59,8 @@ class AttendanceRecord(models.Model):
     late_by_minutes = models.PositiveIntegerField(default=0)
     is_early_exit = models.BooleanField(default=False)
     early_exit_by_minutes = models.PositiveIntegerField(default=0)
+    outside_since = models.DateTimeField(null=True, blank=True)
+    outside_minutes = models.PositiveIntegerField(default=0)
     working_minutes = models.PositiveIntegerField(default=0)
     # Set when this day's check-in happened outside any work area because
     # the employee had an approved OutdoorDutyRequest covering this date —
@@ -181,3 +183,17 @@ class OutdoorDutyRequest(models.Model):
 
     def __str__(self):
         return f"{self.employee.employee_code}: {self.start_date} to {self.end_date} ({self.status})"
+
+class OutsideEvent(models.Model):
+    """One period the employee spent outside their work area during a shift."""
+
+    record = models.ForeignKey(AttendanceRecord, on_delete=models.CASCADE, related_name="outside_events")
+    left_at = models.DateTimeField()
+    returned_at = models.DateTimeField(null=True, blank=True)
+    minutes = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        ordering = ["left_at"]
+
+    def __str__(self):
+        return f"record {self.record_id}: left {self.left_at:%H:%M}"

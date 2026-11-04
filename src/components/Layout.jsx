@@ -9,9 +9,12 @@ import {
   BarChart3,
   Bell,
   Settings as SettingsIcon,
+  Wallet,
+  CalendarDays,
+  Briefcase,
+  MessageSquareWarning,
+  FileText,
   LogOut,
-  ArrowLeftRight,
-  PlaneTakeoff,
 } from "lucide-react";
 import { useAuth } from "../lib/auth";
 import { initials } from "../lib/format";
@@ -20,12 +23,15 @@ import Header from "./Header";
 const NAV = [
   { to: "/", label: "Dashboard", icon: LayoutGrid, end: true },
   { to: "/employees", label: "Employees", icon: Users },
-  { to: "/transfers", label: "Transfer Requests", icon: ArrowLeftRight },
-  { to: "/outdoor-duty", label: "Outdoor Duty", icon: PlaneTakeoff },
-  { to: "/company", label: "Company Setup", icon: Building2 },
-  { to: "/geofences", label: "Geofences", icon: Hexagon },
   { to: "/tracking", label: "Live Tracking", icon: Radar },
   { to: "/attendance", label: "Attendance", icon: Clock },
+  { to: "/payroll", label: "Earnings / Payroll", icon: Wallet },
+  { to: "/leave", label: "Leave Management", icon: CalendarDays },
+  { to: "/outdoor-duty", label: "Outdoor Duty", icon: Briefcase },
+  { to: "/complaints", label: "Complaints", icon: MessageSquareWarning },
+  { to: "/company", label: "Company Setup", icon: Building2 },
+  { to: "/geofences", label: "Geofences", icon: Hexagon },
+  { to: "/policies", label: "Policies", icon: FileText },
   { to: "/reports", label: "Reports", icon: BarChart3 },
   { to: "/notifications", label: "Notifications", icon: Bell },
   { to: "/settings", label: "Settings", icon: SettingsIcon },
@@ -38,9 +44,11 @@ export default function Layout() {
     <div className="app-shell">
       <aside className="sidebar">
         <div className="sidebar-brand">
-          <img src="/miracle5-logo.png" alt="Miracle 5" className="sidebar-brand-mark" style={{ width: 32, height: 32, objectFit: "contain" }} />
+          <span className="sidebar-brand-mark">
+            <Hexagon size={16} color="#eaf3ef" strokeWidth={2.2} />
+          </span>
           <div>
-            <div className="sidebar-brand-name">Miracle 5</div>
+            <div className="sidebar-brand-name">GeoWork Pro</div>
             <div className="sidebar-brand-sub">ADMIN PORTAL</div>
           </div>
         </div>

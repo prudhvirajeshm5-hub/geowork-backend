@@ -12,3 +12,10 @@ media/
 !.env.example
 geowork_backend_backup_*/
 src_broken_backup/
+*backup*/
+*.bak
+*.bak_*
+*.before_*
+/geowork_backend/attendance/
+/geowork_backend/src/
+/geowork_backend/tracking/

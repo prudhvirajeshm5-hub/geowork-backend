@@ -15,8 +15,11 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 SECRET_KEY = config("SECRET_KEY", default="django-insecure-change-me-in-production")
 DEBUG = config("DEBUG", default=True, cast=bool)
-ALLOWED_HOSTS = config("ALLOWED_HOSTS", default="localhost,127.0.0.1", cast=Csv())
-
+ALLOWED_HOSTS = config(
+    "ALLOWED_HOSTS",
+    default="localhost,127.0.0.1,10.74.32.11",
+    cast=Csv(),
+)
 # Render sets this automatically for every web service (e.g.
 # "geowork-backend.onrender.com") — appending it here means you never have
 # to manually chase down and paste your Render URL into ALLOWED_HOSTS by
@@ -57,6 +60,10 @@ INSTALLED_APPS = [
     "dashboard",
     "notifications",
     "reports",
+    "payroll",
+    "leaves",
+    "complaints",
+    "policies",
 ]
 
 MIDDLEWARE = [
@@ -204,6 +211,7 @@ CELERY_RESULT_BACKEND = config("REDIS_URL", default="redis://localhost:6379/0")
 # the global defaults for now.
 GEOFENCE_ENTRY_DEBOUNCE_SECONDS = config("GEOFENCE_ENTRY_DEBOUNCE_SECONDS", default=45, cast=int)
 GEOFENCE_EXIT_DEBOUNCE_SECONDS = config("GEOFENCE_EXIT_DEBOUNCE_SECONDS", default=180, cast=int)
+GEOFENCE_MAX_DECISION_ACCURACY_M = config("GEOFENCE_MAX_DECISION_ACCURACY_M", default=100, cast=int)
 
 # GPS accuracy tiers (V1.1 requirement #8), in meters. A ping is HIGH
 # accuracy at or below the first threshold, NORMAL up to the second, and
@@ -216,6 +224,7 @@ GPS_ACCURACY_NORMAL_METERS = config("GPS_ACCURACY_NORMAL_METERS", default=50, ca
 
 # Live tracking (Module 6)
 LIVE_TRACKING_ONLINE_THRESHOLD_MINUTES = config("LIVE_TRACKING_ONLINE_THRESHOLD_MINUTES", default=5, cast=int)
+LIVE_TRACKING_MAX_SHIFT_HOURS = config("LIVE_TRACKING_MAX_SHIFT_HOURS", default=12, cast=int)
 
 LOGGING = {
     "version": 1,

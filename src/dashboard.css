@@ -1,0 +1,99 @@
+
+/* Admin dashboard layout (matches the GeoWork Pro dashboard design). */
+.dash-greet { font-size: 15px; color: var(--ink-soft); }
+.dash-name { font-size: 28px; font-weight: 800; color: var(--ink); line-height: 1.1; }
+.dash-date { font-size: 13px; color: var(--ink-faint); margin-top: 4px; }
+
+.dash-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  margin: 18px 0;
+}
+.dash-stat {
+  background: #fff;
+  border: 1px solid #e6ebf3;
+  border-radius: 16px;
+  padding: 16px;
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+.dash-stat-icon {
+  width: 42px; height: 42px; border-radius: 12px;
+  display: grid; place-items: center; flex: none;
+}
+.dash-stat-label { font-size: 12px; color: var(--ink-soft); }
+.dash-stat-value { font-size: 26px; font-weight: 800; color: var(--ink); line-height: 1.1; }
+.dash-tone-blue { background: #e8f0fd; color: #2f6fd0; }
+.dash-tone-green { background: #e6f5ed; color: #1e8e5a; }
+.dash-tone-amber { background: #fdf3e1; color: #b86f10; }
+.dash-tone-red { background: #fdecea; color: #d64541; }
+
+.dash-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
+}
+.dash-card {
+  background: #fff;
+  border: 1px solid #e6ebf3;
+  border-radius: 16px;
+  padding: 16px;
+  box-shadow: var(--shadow-sm);
+  margin-bottom: 14px;
+}
+.dash-card h3 { margin: 0 0 12px; font-size: 16px; font-weight: 800; color: var(--ink); }
+.dash-chips { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+.dash-chip {
+  border: 1px solid #d7deea; background: #fff; color: var(--ink-soft);
+  border-radius: 999px; padding: 6px 12px; font-size: 13px; cursor: pointer;
+}
+.dash-chip.on { background: #14284b; border-color: #14284b; color: #fff; }
+.dash-map {
+  height: 340px; border-radius: 14px; overflow: hidden; border: 1px solid #e6ebf3;
+}
+.dash-legend { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 10px; font-size: 12px; color: var(--ink-soft); }
+.dash-legend i {
+  display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px;
+}
+.dash-donut-row { display: flex; align-items: center; gap: 18px; }
+.dash-donut-row ul { list-style: none; margin: 0; padding: 0; flex: 1; }
+.dash-donut-row li {
+  display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--ink-soft);
+  padding: 6px 0;
+}
+.dash-donut-row li b { margin-left: auto; color: var(--ink); font-size: 15px; }
+.dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+.dot.g { background: #1e8e5a; }
+.dot.a { background: #e0a000; }
+.dot.o { background: #e88a12; }
+.dot.r { background: #d64541; }
+.dash-highlight {
+  display: flex; align-items: center; gap: 10px; padding: 12px; border-radius: 12px;
+  font-size: 14px; color: var(--ink); margin-bottom: 8px; background: #f7f9fc;
+}
+.dash-highlight-icon {
+  width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center; flex: none;
+}
+
+@media (max-width: 1100px) {
+  .dash-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .dash-grid { grid-template-columns: 1fr; }
+}
+
+/* Dashboard map fix: employee location list under the map. */
+.dash-loc-list { margin-top: 12px; display: grid; gap: 6px; max-height: 180px; overflow: auto; }
+.dash-loc-row {
+  display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center; text-align: left;
+  border: 1px solid #eef2f8; background: #fff; border-radius: 10px; padding: 8px 10px; cursor: pointer;
+}
+.dash-loc-row:hover { background: #f7f9fc; }
+.dash-loc-name { font-weight: 700; color: var(--ink); font-size: 13px; }
+.dash-loc-sub { font-size: 12px; color: var(--ink-faint); }
+.dash-loc-pill { font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 999px; }
+.dash-loc-pill.on { background: #e6f5ed; color: #1e8e5a; }
+.dash-loc-pill.outside { background: #fdf3e1; color: #b86f10; }
+.dash-loc-pill.offline { background: #fdecea; color: #d64541; }
