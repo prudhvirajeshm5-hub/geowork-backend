@@ -8,3 +8,4 @@ venv312/
 staticfiles/
 .env.production
 .env*
+geowork_backend_backup_*/
