@@ -21,6 +21,11 @@ urlpatterns = [
     path("api/v1/dashboard/", include("dashboard.urls")),
     path("api/v1/notifications/", include("notifications.urls")),
     path("api/v1/reports/", include("reports.urls")),
+    path("api/v1/payroll/", include("payroll.urls")),
+    path("api/v1/outside/", include("attendance.outside_urls")),
+    path("api/v1/leaves/", include("leaves.urls")),
+    path("api/v1/complaints/", include("complaints.urls")),
+    path("api/v1/policies/", include("policies.urls")),
 ]
 
 if settings.DEBUG:

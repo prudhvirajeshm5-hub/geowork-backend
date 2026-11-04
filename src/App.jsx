@@ -1,12 +1,11 @@
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
+import Register from "./pages/Register";
 import { useAuth } from "./lib/auth";
 import { Loading } from "./components/ui";
 import Layout from "./components/Layout";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import Employees from "./pages/Employees";
-import Transfers from "./pages/Transfers";
-import OutdoorDuty from "./pages/OutdoorDuty";
 import CompanySetup from "./pages/CompanySetup";
 import Geofences from "./pages/Geofences";
 import Attendance from "./pages/Attendance";
@@ -14,6 +13,12 @@ import LiveTracking from "./pages/LiveTracking";
 import Reports from "./pages/Reports";
 import Notifications from "./pages/Notifications";
 import Settings from "./pages/Settings";
+import ComingSoon from "./pages/ComingSoon";
+import Payroll from "./pages/Payroll";
+import Leave from "./pages/Leave";
+import OutdoorDuty from "./pages/OutdoorDuty";
+import Complaints from "./pages/Complaints";
+import Policies from "./pages/Policies";
 
 function RequireAuth({ children }) {
   const { user, loading } = useAuth();
@@ -42,6 +47,10 @@ export default function App() {
         element={!loading && user && user.role !== "EMPLOYEE" ? <Navigate to="/" replace /> : <Login />}
       />
       <Route
+  path="/register"
+  element={!loading && user ? <Navigate to="/" replace /> : <Register />}
+/>
+      <Route
         path="/"
         element={
           <RequireAuth>
@@ -51,14 +60,17 @@ export default function App() {
       >
         <Route index element={<Dashboard />} />
         <Route path="employees" element={<Employees />} />
-        <Route path="transfers" element={<Transfers />} />
-        <Route path="outdoor-duty" element={<OutdoorDuty />} />
         <Route path="company" element={<CompanySetup />} />
         <Route path="geofences" element={<Geofences />} />
         <Route path="attendance" element={<Attendance />} />
         <Route path="tracking" element={<LiveTracking />} />
         <Route path="reports" element={<Reports />} />
         <Route path="notifications" element={<Notifications />} />
+        <Route path="payroll" element={<Payroll />} />
+        <Route path="leave" element={<Leave />} />
+        <Route path="outdoor-duty" element={<OutdoorDuty />} />
+        <Route path="complaints" element={<Complaints />} />
+        <Route path="policies" element={<Policies />} />
         <Route path="settings" element={<Settings />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />

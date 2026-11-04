@@ -1,87 +1,101 @@
+
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
-import { GoogleMap, Marker, Polygon, InfoWindow, useJsApiLoader } from "@react-google-maps/api";
-import {
-  Users,
-  CheckCircle2,
-  XCircle,
-  Clock3,
-  Activity,
-  MapPinOff,
-  SatelliteDish,
-  Briefcase,
-  RefreshCw,
-  X,
-} from "lucide-react";
+import { GoogleMap, InfoWindow, Marker, useJsApiLoader } from "@react-google-maps/api";
+import { Users, UserCheck, Briefcase, UserX, CalendarClock, MessageSquareWarning, MapPin } from "lucide-react";
 import api, { apiErrorMessage } from "../lib/api";
 import { useAuth } from "../lib/auth";
-import StatCard from "../components/StatCard";
-import { Alert, Loading, StatusBadge } from "../components/ui";
-import { timeAgo, todayISO, initials } from "../lib/format";
+import { Alert, Loading } from "../components/ui";
+import "../dashboard.css";
 
-const DEFAULT_CENTER = { lat: 18.5204, lng: 73.8567 }; // Pune
+const MAPS_OPTIONS = {
+  id: "geowork-maps",
+  googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY,
+};
+const DEFAULT_CENTER = { lat: 18.5204, lng: 73.8567 };
+const COLORS = { online: "#1e8e5a", outside: "#e88a12", offline: "#d64541" };
+const LABELS = { online: "Online", outside: "Outdoor", offline: "Offline" };
 
-/** Derive an "inside / near boundary / outside / offline" read from what the live-status API actually reports. */
-function markerState(row) {
-  if (row.connectivity_status === "OFFLINE") return { tone: "offline", color: "#7c8b88", label: "Offline" };
-  if (row.connectivity_status === "GPS_DISABLED" || row.connectivity_status === "INTERNET_DISCONNECTED") {
-    return { tone: "warning", color: "#B1690F", label: "Connectivity issue" };
-  }
-  if (row.current_work_area_name) return { tone: "inside", color: "#4A90E2", label: "Inside workplace" };
-  return { tone: "outside", color: "#A8342B", label: "Outside workplace" };
+const FILTERS = [
+  { key: "all", label: "All" },
+  { key: "online", label: "Online" },
+  { key: "outside", label: "Outdoor" },
+  { key: "offline", label: "Offline" },
+];
+
+function initialsOf(name) {
+  return (name || "?")
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((p) => p[0].toUpperCase())
+    .join("");
 }
 
-function pinIcon(color) {
-  return {
-    path: "M 0,0 C -6,-10 -10,-15 -10,-20 A 10,10 0 1 1 10,-20 C 10,-15 6,-10 0,0 Z",
-    fillColor: color,
-    fillOpacity: 1,
-    strokeColor: "#fff",
-    strokeWeight: 2,
-    scale: 0.9,
-    anchor: typeof window !== "undefined" && window.google ? new window.google.maps.Point(0, 0) : undefined,
-  };
+function markerImage(status) {
+  const svg =
+    `<svg xmlns="http://www.w3.org/2000/svg" width="34" height="34" viewBox="0 0 34 34">` +
+    `<circle cx="17" cy="17" r="13" fill="${COLORS[status]}" stroke="#ffffff" stroke-width="3"/></svg>`;
+  return { url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}` };
+}
+
+function statusOf(r) {
+  if (!r.is_online) return "offline";
+  if (!r.current_work_area && !r.current_work_area_name) return "outside";
+  return "online";
+}
+
+function StatCard({ icon: Icon, tone, label, value }) {
+  return (
+    <div className="dash-stat">
+      <span className={`dash-stat-icon dash-tone-${tone}`}>
+        <Icon size={20} />
+      </span>
+      <div>
+        <div className="dash-stat-label">{label}</div>
+        <div className="dash-stat-value">{value}</div>
+      </div>
+    </div>
+  );
+}
+
+function Highlight({ icon: Icon, tone, text }) {
+  return (
+    <div className="dash-highlight">
+      <span className={`dash-stat-icon dash-tone-${tone} dash-highlight-icon`}>
+        <Icon size={16} />
+      </span>
+      <span>{text}</span>
+    </div>
+  );
 }
 
 export default function Dashboard() {
-  const { isLoaded: mapsLoaded, loadError: mapsLoadError } = useJsApiLoader({
-    id: "geowork-google-maps",
-    googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "",
-  });
   const { user } = useAuth();
-  const [branches, setBranches] = useState([]);
-  const [branch, setBranch] = useState("");
-  const [date, setDate] = useState(todayISO());
+  const { isLoaded, loadError } = useJsApiLoader(MAPS_OPTIONS);
   const [summary, setSummary] = useState(null);
   const [live, setLive] = useState([]);
-  const [workAreas, setWorkAreas] = useState([]);
-  const [selected, setSelected] = useState(null);
+  const [leavesPending, setLeavesPending] = useState(0);
+  const [complaintsOpen, setComplaintsOpen] = useState(0);
+  const [filter, setFilter] = useState("all");
+  const [info, setInfo] = useState(null);
+  const [mapRef, setMapRef] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-
-  useEffect(() => {
-    api
-      .get("/company/branches/", { params: { is_active: true, page_size: 100 } })
-      .then(({ data }) => setBranches(data.results || data))
-      .catch(() => {});
-  }, []);
 
   const load = async () => {
     setLoading(true);
     setError("");
     try {
-      const params = { date };
-      if (branch) params.branch = branch;
-      const liveParams = { page_size: 100, ...(branch ? { branch } : {}) };
-      const workAreaParams = { page_size: 200, is_active: true, ...(branch ? { branch } : {}) };
-      const [summaryRes, liveRes, workAreaRes] = await Promise.all([
-        api.get("/dashboard/summary/", { params }),
-        api.get("/tracking/live/", { params: liveParams }),
-        api.get("/geofence/work-areas/", { params: workAreaParams }),
+      const [sumRes, liveRes, leaveRes, compRes] = await Promise.all([
+        api.get("/dashboard/summary/"),
+        api.get("/tracking/live/", { params: { page_size: 200 } }),
+        api.get("/leaves/pending/").catch(() => ({ data: { results: [] } })),
+        api.get("/complaints/company/", { params: { status: "OPEN" } }).catch(() => ({ data: { results: [] } })),
       ]);
-      setSummary(summaryRes.data);
+      setSummary(sumRes.data);
       setLive(liveRes.data.results || liveRes.data);
-      setWorkAreas(workAreaRes.data.results || workAreaRes.data);
+      setLeavesPending((leaveRes.data.results || []).length);
+      setComplaintsOpen((compRes.data.results || []).length);
     } catch (err) {
       setError(apiErrorMessage(err, "Couldn't load the dashboard right now."));
     } finally {
@@ -92,275 +106,233 @@ export default function Dashboard() {
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [branch, date]);
+  }, []);
 
-  const isManager = user?.role === "ADMIN" || user?.role === "MANAGER";
+  const located = useMemo(
+    () => live.filter((r) => r.last_latitude != null && r.last_longitude != null),
+    [live]
+  );
 
-  const located = useMemo(() => live.filter((r) => r.last_latitude != null && r.last_longitude != null), [live]);
-  const mapCenter = useMemo(() => {
-    if (located[0]) return { lat: located[0].last_latitude, lng: located[0].last_longitude };
-    const firstArea = workAreas.find((w) => w.boundary_points?.length);
-    if (firstArea) return { lat: firstArea.boundary_points[0].latitude, lng: firstArea.boundary_points[0].longitude };
-    return DEFAULT_CENTER;
-  }, [located, workAreas]);
+  const counts = useMemo(() => {
+    const c = { all: live.length, online: 0, outside: 0, offline: 0 };
+    live.forEach((r) => {
+      c[statusOf(r)] += 1;
+    });
+    return c;
+  }, [live]);
 
+  const shown = filter === "all" ? located : located.filter((r) => statusOf(r) === filter);
+
+  const fitToEmployees = (map) => {
+    setMapRef(map);
+    if (!window.google || located.length === 0) return;
+    const bounds = new window.google.maps.LatLngBounds();
+    located.forEach((r) => bounds.extend({ lat: r.last_latitude, lng: r.last_longitude }));
+    map.fitBounds(bounds, 60);
+  };
+
+  const focusEmployee = (r) => {
+    setInfo(r);
+    if (mapRef) {
+      mapRef.panTo({ lat: r.last_latitude, lng: r.last_longitude });
+    }
+  };
+
+  const total = summary?.total_employees ?? 0;
+  const presentToday = (summary?.present ?? 0) + (summary?.late ?? 0) + (summary?.half_day ?? 0);
+  const pct = total ? Math.round((presentToday / total) * 100) : 0;
+  const outsideNow = summary?.outside_work_area ?? 0;
   const hour = new Date().getHours();
-  const greeting = hour < 12 ? "morning" : hour < 17 ? "afternoon" : "evening";
+  const greeting = hour < 12 ? "Good Morning" : hour < 17 ? "Good Afternoon" : "Good Evening";
+  const dateLabel = new Date().toLocaleDateString("en-IN", {
+    weekday: "short",
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+  const ring = 2 * Math.PI * 46;
+
+  const renderMap = () => {
+    if (loadError) {
+      return <div className="dash-map-msg">Google Maps couldn't load. Check the Maps API key.</div>;
+    }
+    if (!isLoaded) {
+      return <Loading />;
+    }
+    return (
+      <GoogleMap
+        mapContainerStyle={{ height: "100%", width: "100%" }}
+        center={DEFAULT_CENTER}
+        zoom={12}
+        onLoad={fitToEmployees}
+        options={{ streetViewControl: false, mapTypeControl: false, fullscreenControl: true }}
+      >
+        {shown.map((r) => {
+          const st = statusOf(r);
+          return (
+            <Marker
+              key={r.employee}
+              position={{ lat: r.last_latitude, lng: r.last_longitude }}
+              icon={markerImage(st)}
+              label={{ text: initialsOf(r.employee_name), color: "#ffffff", fontSize: "10px", fontWeight: "700" }}
+              onClick={() => setInfo(r)}
+            />
+          );
+        })}
+        {info && (
+          <InfoWindow
+            position={{ lat: info.last_latitude, lng: info.last_longitude }}
+            onCloseClick={() => setInfo(null)}
+          >
+            <div style={{ fontSize: 13, lineHeight: 1.5 }}>
+              <strong>{info.employee_name}</strong> ({info.employee_code})
+              <br />
+              {LABELS[statusOf(info)]}
+              {info.current_work_area_name ? ` · ${info.current_work_area_name}` : ""}
+              <br />
+              Last update: {info.minutes_since_last_ping != null ? `${info.minutes_since_last_ping} min ago` : "—"}
+            </div>
+          </InfoWindow>
+        )}
+      </GoogleMap>
+    );
+  };
 
   return (
     <div className="page" style={{ maxWidth: "none" }}>
-      <div className="page-head">
-        <div>
-          <div className="page-eyebrow">Today's field ops</div>
-          <h1>
-            Good {greeting}, {user?.first_name || "Admin"}
-          </h1>
-          <p className="page-sub">
-            {new Date().toLocaleDateString(undefined, { weekday: "long", day: "2-digit", month: "long", year: "numeric" })}
-          </p>
-        </div>
-        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-          <input className="input" type="date" value={date} onChange={(e) => setDate(e.target.value)} style={{ width: 160 }} />
-          <select className="input" value={branch} onChange={(e) => setBranch(e.target.value)} style={{ width: 180 }}>
-            <option value="">All branches</option>
-            {branches.map((b) => (
-              <option key={b.id} value={b.id}>
-                {b.name}
-              </option>
-            ))}
-          </select>
-          <button className="btn btn-icon" onClick={load} title="Refresh">
-            <RefreshCw size={15} />
-          </button>
-        </div>
+      <div>
+        <div className="dash-greet">{greeting}</div>
+        <div className="dash-name">{user?.first_name || "Admin"}</div>
+        <div className="dash-date">{dateLabel}</div>
       </div>
 
-      <Alert>{error}</Alert>
-
-      {!isManager && (
-        <Alert tone="info">You're signed in as an employee. Dashboard figures reflect what admins and managers can see.</Alert>
-      )}
-
+      {error && <Alert>{error}</Alert>}
       {loading && !summary ? (
-        <Loading label="Pulling today's numbers…" />
+        <Loading />
       ) : (
-        summary && (
-          <div className="stat-grid">
-            <StatCard icon={Users} label="Total employees" value={summary.total_employees} tone="slate" />
-            <StatCard icon={CheckCircle2} label="Present" value={summary.present} tone="green" />
-            <StatCard icon={XCircle} label="Absent" value={summary.absent} tone="red" />
-            <StatCard icon={Clock3} label="Late arrivals" value={summary.late} tone="amber" />
-            <StatCard icon={Activity} label="Currently working" value={summary.working} tone="blue" />
-            <StatCard icon={Clock3} label="Half day" value={summary.half_day} tone="amber" />
-            <StatCard icon={MapPinOff} label="Outside work area" value={summary.outside_work_area} tone="red" />
-            <StatCard icon={SatelliteDish} label="GPS disabled" value={summary.gps_disabled} tone="red" />
-          </div>
-        )
-      )}
-
-      <div className="dash-layout">
-        <div className="dash-map-card">
-          {mapsLoadError ? (
-            <div style={{ height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
-              Map could not be loaded.
-            </div>
-          ) : !mapsLoaded ? (
-            <div style={{ height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
-              Loading map…
-            </div>
-          ) : (
-            <GoogleMap
-              center={mapCenter}
-              zoom={13}
-              mapContainerStyle={{ height: "100%", width: "100%" }}
-              mapContainerClassName="map-shell"
-              options={{ streetViewControl: false, fullscreenControl: true }}
-            >
-              {workAreas.map((wa) => {
-                const positions = (wa.boundary_points || []).map((p) => ({ lat: p.latitude, lng: p.longitude }));
-                if (positions.length < 3) return null;
-                return (
-                  <Polygon
-                    key={wa.id}
-                    paths={positions}
-                    options={{
-                      strokeColor: wa.color || "#4A90E2",
-                      strokeWeight: 1.5,
-                      fillColor: wa.color || "#4A90E2",
-                      fillOpacity: 0.1,
-                    }}
-                  />
-                );
-              })}
-              {located.map((r) => {
-                const state = markerState(r);
-                return (
-                  <Marker
-                    key={r.employee}
-                    position={{ lat: r.last_latitude, lng: r.last_longitude }}
-                    icon={pinIcon(state.color)}
-                    onClick={() => setSelected(r)}
-                  />
-                );
-              })}
-              {selected && (
-                <InfoWindow
-                  position={{ lat: selected.last_latitude, lng: selected.last_longitude }}
-                  onCloseClick={() => setSelected(null)}
-                >
-                  <strong>{selected.employee_name}</strong>
-                </InfoWindow>
-              )}
-            </GoogleMap>
-          )}
-
-          <div className="map-legend">
-            <div
-              style={{
-                fontFamily: "var(--font-mono)",
-                fontSize: 10,
-                letterSpacing: "0.06em",
-                color: "var(--ink-faint)",
-                marginBottom: 2,
-              }}
-            >
-              LIVE WORKFORCE
-            </div>
-            <div className="map-legend-row">
-              <span className="map-legend-dot" style={{ background: "#4A90E2" }} /> Inside
-            </div>
-            <div className="map-legend-row">
-              <span className="map-legend-dot" style={{ background: "#B1690F" }} /> Near boundary / GPS issue
-            </div>
-            <div className="map-legend-row">
-              <span className="map-legend-dot" style={{ background: "#A8342B" }} /> Outside
-            </div>
-            <div className="map-legend-row">
-              <span className="map-legend-dot" style={{ background: "#7c8b88" }} /> Offline
-            </div>
+        <>
+          <div className="dash-stats">
+            <StatCard icon={Users} tone="blue" label="Total Employees" value={total} />
+            <StatCard icon={UserCheck} tone="green" label="Present Today" value={presentToday} />
+            <StatCard icon={Briefcase} tone="amber" label="Outside Work Area" value={outsideNow} />
+            <StatCard icon={UserX} tone="red" label="Absent Today" value={summary?.absent ?? 0} />
           </div>
 
-          {selected && (
-            <div className="dash-employee-panel">
-              <div className="dash-employee-panel-head">
-                <div>
-                  <div className="cell-primary">{selected.employee_name}</div>
-                  <div className="cell-sub mono">{selected.employee_code}</div>
-                </div>
-                <button className="dash-employee-panel-close" onClick={() => setSelected(null)} aria-label="Close">
-                  <X size={14} />
-                </button>
-              </div>
-              <div className="dash-employee-row">
-                <span>Status</span>
-                <StatusBadge
-                  tone={
-                    markerState(selected).tone === "inside"
-                      ? "green"
-                      : markerState(selected).tone === "outside"
-                      ? "red"
-                      : markerState(selected).tone === "warning"
-                      ? "amber"
-                      : "slate"
-                  }
-                >
-                  {markerState(selected).label}
-                </StatusBadge>
-              </div>
-              <div className="dash-employee-row">
-                <span>Workplace</span>
-                <span>{selected.current_work_area_name || "—"}</span>
-              </div>
-              <div className="dash-employee-row">
-                <span>Shift</span>
-                <span>{(selected.shift_status || "").replace(/_/g, " ") || "—"}</span>
-              </div>
-              <div className="dash-employee-row">
-                <span>Last location</span>
-                <span>{timeAgo(selected.last_ping_at)}</span>
-              </div>
-              {selected.last_accuracy_meters != null && (
-                <div className="dash-employee-row">
-                  <span>GPS accuracy</span>
-                  <span>{Math.round(selected.last_accuracy_meters)}m</span>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-
-        <div className="card" style={{ display: "flex", flexDirection: "column", minHeight: 0 }}>
-          <div className="card-head">
-            <div>
-              <h3>Live roster</h3>
-              <div className="card-head-sub">{located.length} reporting a location</div>
-            </div>
-            <Link to="/tracking" className="btn btn-sm">
-              Full map
-            </Link>
-          </div>
-          <div style={{ overflowY: "auto", flex: 1, maxHeight: 400 }}>
-            {live.length === 0 ? (
-              <div className="card-pad" style={{ color: "var(--ink-faint)", fontSize: 13 }}>
-                No location pings reported yet today.
-              </div>
-            ) : (
-              live.slice(0, 20).map((row) => {
-                const state = markerState(row);
-                return (
-                  <div
-                    key={row.employee}
-                    onClick={() => row.last_latitude != null && setSelected(row)}
-                    style={{
-                      padding: "10px 18px",
-                      borderBottom: "1px solid var(--line)",
-                      cursor: row.last_latitude != null ? "pointer" : "default",
-                      background: selected?.employee === row.employee ? "var(--panel-sunken)" : "transparent",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 10,
-                    }}
+          <div className="dash-grid">
+            <section className="dash-card">
+              <h3>Live Employee Locations</h3>
+              <div className="dash-chips">
+                {FILTERS.map((f) => (
+                  <button
+                    key={f.key}
+                    type="button"
+                    className={`dash-chip${filter === f.key ? " on" : ""}`}
+                    onClick={() => setFilter(f.key)}
                   >
-                    <span className="sidebar-avatar" style={{ width: 26, height: 26, fontSize: 10.5 }}>
-                      {initials(row.employee_name)}
-                    </span>
-                    <div style={{ minWidth: 0, flex: 1 }}>
-                      <div className="cell-primary" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                        {row.employee_name}
-                      </div>
-                      <div className="cell-sub">{row.current_work_area_name || "No active work area"}</div>
-                    </div>
-                    <StatusBadge
-                      tone={state.tone === "inside" ? "green" : state.tone === "outside" ? "red" : state.tone === "warning" ? "amber" : "slate"}
-                    >
-                      {state.label}
-                    </StatusBadge>
-                  </div>
-                );
-              })
-            )}
-          </div>
-        </div>
-      </div>
+                    {f.label} ({counts[f.key]})
+                  </button>
+                ))}
+              </div>
+              <div className="dash-map">{renderMap()}</div>
+              <div className="dash-legend">
+                <span>
+                  <i style={{ background: COLORS.online }} />
+                  Online
+                </span>
+                <span>
+                  <i style={{ background: COLORS.outside }} />
+                  Outdoor
+                </span>
+                <span>
+                  <i style={{ background: COLORS.offline }} />
+                  Offline
+                </span>
+              </div>
 
-      <div className="card">
-        <div className="card-head">
-          <div>
-            <h3>Job management</h3>
-            <div className="card-head-sub">Part of Phase 2 (V2.0)</div>
+              <div className="dash-loc-list">
+                {shown.length === 0 ? (
+                  <div className="dash-loc-sub">No employees with a recorded location yet.</div>
+                ) : (
+                  shown.map((r) => {
+                    const st = statusOf(r);
+                    return (
+                      <button key={r.employee} type="button" className="dash-loc-row" onClick={() => focusEmployee(r)}>
+                        <span>
+                          <span className="dash-loc-name">{r.employee_name}</span>
+                          <span className="dash-loc-sub">
+                            {" "}
+                            {r.employee_code} · {r.last_latitude.toFixed(5)}, {r.last_longitude.toFixed(5)}
+                            {r.minutes_since_last_ping != null ? ` · ${r.minutes_since_last_ping} min ago` : ""}
+                          </span>
+                        </span>
+                        <span className={`dash-loc-pill ${st}`}>{LABELS[st]}</span>
+                      </button>
+                    );
+                  })
+                )}
+              </div>
+            </section>
+
+            <aside>
+              <section className="dash-card">
+                <h3>Today's Attendance</h3>
+                <div className="dash-donut-row">
+                  <svg width="120" height="120" viewBox="0 0 120 120">
+                    <circle cx="60" cy="60" r="46" stroke="#e6ebf3" strokeWidth="12" fill="none" />
+                    <circle
+                      cx="60"
+                      cy="60"
+                      r="46"
+                      stroke="#1e8e5a"
+                      strokeWidth="12"
+                      fill="none"
+                      strokeLinecap="round"
+                      strokeDasharray={`${(pct / 100) * ring} ${ring}`}
+                      transform="rotate(-90 60 60)"
+                    />
+                    <text x="60" y="66" textAnchor="middle" fontSize="20" fontWeight="800" fill="#18223a">
+                      {pct}%
+                    </text>
+                  </svg>
+                  <ul>
+                    <li>
+                      <span className="dot g" /> Present <b>{summary?.present ?? 0}</b>
+                    </li>
+                    <li>
+                      <span className="dot a" /> Late <b>{summary?.late ?? 0}</b>
+                    </li>
+                    <li>
+                      <span className="dot o" /> Outside <b>{outsideNow}</b>
+                    </li>
+                    <li>
+                      <span className="dot r" /> Absent <b>{summary?.absent ?? 0}</b>
+                    </li>
+                  </ul>
+                </div>
+              </section>
+
+              <section className="dash-card">
+                <h3>Today's Highlights</h3>
+                <Highlight
+                  icon={CalendarClock}
+                  tone="amber"
+                  text={`${leavesPending} leave request${leavesPending === 1 ? "" : "s"} pending`}
+                />
+                <Highlight
+                  icon={MessageSquareWarning}
+                  tone="red"
+                  text={`${complaintsOpen} open complaint${complaintsOpen === 1 ? "" : "s"}`}
+                />
+                <Highlight
+                  icon={MapPin}
+                  tone="blue"
+                  text={`${outsideNow} employee${outsideNow === 1 ? "" : "s"} outside work area`}
+                />
+              </section>
+            </aside>
           </div>
-          <Briefcase size={18} color="var(--ink-faint)" />
-        </div>
-        <div className="card-pad" style={{ color: "var(--ink-soft)", fontSize: 13.5 }}>
-          {summary?.jobs_module_available ? (
-            <span>
-              {summary.jobs_completed} completed · {summary.pending_jobs} pending
-            </span>
-          ) : (
-            "Job & customer-visit tracking rolls out with V2.0 Workforce Management. Nothing to report yet."
-          )}
-        </div>
-      </div>
+        </>
+      )}
     </div>
   );
 }

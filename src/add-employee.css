@@ -1,0 +1,105 @@
+
+/* Add Employee wizard (matches the GeoWork Pro add employee design). */
+.aem-steps {
+  display: flex; gap: 6px; padding: 4px 0 14px; border-bottom: 1px solid #e6ebf3; margin-bottom: 14px; flex-wrap: wrap;
+}
+.aem-step {
+  display: flex; align-items: center; gap: 8px; padding: 10px 12px; border: none; background: transparent;
+  color: var(--ink-faint); font-size: 14px; border-bottom: 2px solid transparent; cursor: pointer;
+}
+.aem-step.on { color: #14284b; font-weight: 700; border-bottom-color: #14284b; }
+.aem-step.done { color: var(--brand); cursor: pointer; }
+.aem-num {
+  width: 26px; height: 26px; border-radius: 50%; background: #eceff5; color: var(--ink-soft);
+  display: inline-grid; place-items: center; font-size: 12px; font-weight: 700;
+}
+.aem-step.on .aem-num { background: #14284b; color: #fff; }
+.aem-step.done .aem-num { background: var(--brand); color: #fff; }
+
+.aem-body { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr); gap: 14px; }
+.aem-main {
+  border: 1px solid #e6ebf3; border-radius: 16px; padding: 16px; min-width: 0;
+}
+.aem-title { display: flex; gap: 10px; align-items: center; margin-bottom: 14px; }
+.aem-title-icon {
+  width: 30px; height: 30px; border-radius: 50%; background: var(--brand); color: #fff;
+  display: inline-grid; place-items: center; font-weight: 700; font-size: 13px;
+}
+.aem-title-text { font-size: 16px; font-weight: 800; color: var(--ink); }
+.aem-sub { font-size: 12px; color: var(--ink-faint); }
+
+.aem-grid { display: grid; grid-template-columns: 160px minmax(0, 1fr); gap: 14px; }
+.aem-photo-box {
+  height: 170px; border: 1px dashed #b9c6da; border-radius: 14px; background: #f5f8fc;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
+  color: #2f6fd0; font-weight: 600; text-align: center;
+}
+.aem-photo-box small { color: var(--ink-faint); font-weight: 400; font-size: 11px; }
+.aem-cols { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 14px; }
+.aem-full { grid-column: 1 / -1; }
+.aem-field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.aem-label { font-size: 13px; font-weight: 600; color: var(--ink); }
+.aem-req { color: #d64541; }
+.aem-hint { font-size: 11px; color: var(--ink-faint); align-self: flex-end; }
+.aem-group { display: flex; gap: 8px; }
+.aem-group .input { flex: 1; min-width: 0; }
+.aem-dial { width: 92px; flex: none; }
+.aem-auto {
+  border: 1px solid #d7deea; background: #fff; border-radius: var(--radius); padding: 0 14px;
+  font-weight: 600; color: var(--ink-soft); cursor: pointer;
+}
+
+.aem-preview {
+  border: 1px solid #cfe8da; background: #f3fbf6; border-radius: 16px; padding: 16px; min-width: 0;
+}
+.aem-preview-title { font-size: 15px; font-weight: 800; color: var(--ink); margin-bottom: 12px; }
+.aem-preview-id { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+.aem-preview-avatar {
+  width: 58px; height: 58px; border-radius: 50%; background: #e2e8f0; color: #6b7a90;
+  display: inline-grid; place-items: center;
+}
+.aem-preview-name { font-size: 15px; font-weight: 800; color: var(--ink); }
+.aem-preview-rows { background: #fff; border-radius: 12px; border: 1px solid #e6ebf3; padding: 4px 12px; }
+.aem-preview-row {
+  display: flex; justify-content: space-between; gap: 10px; padding: 9px 0;
+  border-bottom: 1px solid #f0f3f8; font-size: 13px;
+}
+.aem-preview-row:last-child { border-bottom: none; }
+.aem-preview-row span { color: var(--ink-soft); }
+.aem-preview-row b { color: var(--ink); font-weight: 600; text-align: right; }
+.aem-note {
+  margin-top: 12px; padding: 12px; border-radius: 12px; background: #eaf2ff; color: #2f5fa8; font-size: 12px; line-height: 1.5;
+}
+
+.aem-footer {
+  display: flex; justify-content: space-between; align-items: center; margin-top: 16px; padding-top: 14px;
+  border-top: 1px solid #e6ebf3;
+}
+.aem-footer-right { display: flex; gap: 10px; }
+
+@media (max-width: 900px) {
+  .aem-body { grid-template-columns: 1fr; }
+  .aem-grid { grid-template-columns: 1fr; }
+  .aem-cols { grid-template-columns: 1fr; }
+}
+
+/* aem-layout-v2: wider form, photo strip, fixed preview, single-line steps. */
+.aem-steps { flex-wrap: nowrap; overflow-x: auto; gap: 2px; }
+.aem-step { padding: 8px 10px; font-size: 13px; white-space: nowrap; flex: none; }
+.aem-body { grid-template-columns: minmax(0, 1fr) 290px; }
+.aem-main { padding: 18px; }
+.aem-grid { grid-template-columns: 1fr; gap: 14px; }
+.aem-photo-box {
+  height: 84px; flex-direction: row; justify-content: flex-start; gap: 12px;
+  padding: 0 18px; text-align: left;
+}
+.aem-photo-box small { display: block; }
+.aem-cols { gap: 14px 16px; }
+.aem-group { gap: 6px; }
+.aem-dial { width: 88px; }
+.aem-group .input, .aem-field > .input { min-width: 0; }
+.aem-field > .input, .aem-group .input { height: 40px; }
+.aem-auto { height: 40px; padding: 0 12px; }
+@media (max-width: 1100px) {
+  .aem-body { grid-template-columns: 1fr; }
+}

@@ -1,0 +1,67 @@
+
+/* Outdoor Duty (matches the GeoWork Pro outdoor duty design). */
+.od-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; margin-bottom: 16px; }
+.od-controls { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.od-controls .input { width: auto; min-width: 150px; height: 40px; }
+.od-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-bottom: 16px; }
+.od-stat { background: #fff; border: 1px solid #e6ebf3; border-radius: 16px; padding: 16px; display: flex; gap: 12px; align-items: flex-start; box-shadow: var(--shadow-sm); }
+.od-stat-icon { width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center; flex: none; }
+.od-stat-label { font-size: 12px; color: var(--ink-soft); }
+.od-stat-value { font-size: 24px; font-weight: 800; color: var(--ink); line-height: 1.2; }
+.od-stat-sub { font-size: 12px; color: var(--ink-faint); }
+.od-tone-green { background: #e6f5ed; color: #1e8e5a; }
+.od-tone-blue { background: #e8f0fd; color: #2f6fd0; }
+.od-tone-amber { background: #fdf3e1; color: #b86f10; }
+.od-tone-red { background: #fdecea; color: #d64541; }
+
+.od-tabs { display: flex; gap: 26px; border-bottom: 1px solid #e6ebf3; margin-bottom: 16px; flex-wrap: wrap; }
+.od-tab { border: none; background: transparent; padding: 10px 2px 12px; color: var(--ink-soft); font-size: 14px; font-weight: 500; border-bottom: 2px solid transparent; cursor: pointer; }
+.od-tab.on { color: var(--brand); font-weight: 700; border-bottom-color: var(--brand); }
+.od-tab:focus { outline: none; }
+
+.od-main { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 16px; align-items: start; }
+.od-card { background: #fff; border: 1px solid #e6ebf3; border-radius: 16px; padding: 16px; box-shadow: var(--shadow-sm); min-width: 0; }
+.od-title { font-weight: 800; color: var(--ink); margin-bottom: 12px; font-size: 16px; }
+.od-filters { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 14px; }
+.od-search { flex: 1 1 240px; display: flex; align-items: center; gap: 8px; height: 40px; padding: 0 12px; border: 1px solid #d7deea; border-radius: var(--radius); color: var(--ink-faint); }
+.od-search input { flex: 1; border: none; outline: none; background: transparent; font-size: 14px; }
+.od-filters select.input { width: auto; min-width: 150px; height: 40px; }
+.od-table th { font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--ink-soft); background: #f6f8fb; }
+.od-table td { padding: 12px; vertical-align: middle; }
+.od-name { display: flex; align-items: center; gap: 10px; }
+.od-avatar { width: 34px; height: 34px; border-radius: 50%; background: #14284b; color: #fff; font-size: 11px; font-weight: 700; display: inline-grid; place-items: center; flex: none; }
+.od-sub { font-size: 12px; color: var(--ink-faint); }
+.od-pill { display: inline-block; padding: 4px 11px; border-radius: 999px; font-size: 12px; font-weight: 700; }
+.od-pill.APPROVED { background: #e6f5ed; color: #1e8e5a; }
+.od-pill.PENDING { background: #fdf3e1; color: #b86f10; }
+.od-pill.REJECTED { background: #fdecea; color: #d64541; }
+.od-pill.CANCELLED { background: #eceff5; color: #5b6680; }
+.od-act { display: flex; gap: 6px; }
+.od-act button { width: 32px; height: 32px; border-radius: 10px; border: 1px solid #d7deea; background: #fff; display: inline-grid; place-items: center; cursor: pointer; color: var(--ink-soft); }
+.od-act button.ok { color: #1e8e5a; border-color: #bfe3cf; }
+.od-act button.no { color: #d64541; border-color: #f2c4c2; }
+.od-act button:disabled { opacity: 0.45; cursor: default; }
+.od-footer { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 14px; }
+.od-pager { display: flex; gap: 6px; align-items: center; }
+.od-pg { min-width: 34px; height: 34px; border-radius: 10px; border: 1px solid #d7deea; background: #fff; color: var(--ink-soft); cursor: pointer; }
+.od-pg.on { background: #14284b; border-color: #14284b; color: #fff; }
+.od-pg:disabled { opacity: 0.45; cursor: default; }
+.od-note { padding: 28px; text-align: center; color: var(--ink-faint); }
+
+.od-form label { display: block; font-size: 13px; font-weight: 600; color: var(--ink); margin: 12px 0 6px; }
+.od-form label span { color: #d64541; }
+.od-form .input { width: 100%; }
+.od-form textarea.input { min-height: 90px; resize: vertical; }
+.od-count { font-size: 11px; color: var(--ink-faint); text-align: right; margin-top: 4px; }
+.od-submit { width: 100%; margin-top: 14px; height: 42px; }
+
+.od-today { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid #f0f3f8; }
+.od-today:last-child { border-bottom: none; }
+.od-today-main { flex: 1; min-width: 0; }
+.od-today-main b { display: block; font-size: 14px; color: var(--ink); }
+.od-live { font-size: 12px; color: #1e8e5a; font-weight: 700; }
+
+@media (max-width: 1200px) {
+  .od-main { grid-template-columns: 1fr; }
+  .od-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}

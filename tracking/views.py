@@ -8,7 +8,7 @@ from attendance.serializers import AttendanceRecordSerializer
 
 from . import services
 from .models import EmployeeLiveStatus, LocationPing
-from .serializers import EmployeeLiveStatusSerializer, LocationPingSerializer, PingSerializer
+from .serializers import EmployeeLiveStatusSerializer, HeartbeatSerializer, LocationPingSerializer, PingSerializer
 
 
 class PingView(APIView):
@@ -34,6 +34,7 @@ class PingView(APIView):
             gps_enabled=data.get("gps_enabled", True),
             network_connected=data.get("network_connected", True),
             recorded_at=data.get("recorded_at"),
+            event_id=data.get("event_id"),
         )
 
         response = {"live_status": EmployeeLiveStatusSerializer(live_status).data}
@@ -75,3 +76,22 @@ class LocationPingHistoryViewSet(viewsets.ReadOnlyModelViewSet):
             return qs
         employee = getattr(user, "employee_profile", None)
         return qs.filter(employee=employee) if employee else qs.none()
+
+class HeartbeatView(APIView):
+    """Status-only check-in from the phone. Carries no location, so it still
+    works when GPS is switched off."""
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        serializer = HeartbeatSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        live_status = services.record_heartbeat(
+            request.user,
+            gps_enabled=data["gps_enabled"],
+            network_connected=data["network_connected"],
+            battery_level=data.get("battery_level"),
+        )
+        return Response({"live_status": EmployeeLiveStatusSerializer(live_status).data}, status=status.HTTP_200_OK)

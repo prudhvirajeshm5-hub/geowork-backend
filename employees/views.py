@@ -27,6 +27,31 @@ class AdminResetPasswordRequestSerializer(serializers.Serializer):
 
 
 class EmployeeViewSet(viewsets.ModelViewSet):
+    def create(self, request, *args, **kwargs):
+        from django.contrib.auth import get_user_model
+        from django.db import IntegrityError
+
+        User = get_user_model()
+        phone = str(request.data.get("phone", "")).strip()
+        email = str(request.data.get("email", "")).strip()
+        if phone and User.objects.filter(phone=phone).exists():
+            return Response(
+                {"detail": "This phone number is already used by another account. Use a different number."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if email and User.objects.filter(email__iexact=email).exists():
+            return Response(
+                {"detail": "This email address is already used by another account. Use a different email."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        try:
+            return super().create(request, *args, **kwargs)
+        except IntegrityError:
+            return Response(
+                {"detail": "This employee code is already used in your company. Use a different code."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
     """
     Module 3 - Employee Management.
     List/retrieve: any authenticated user in the tenant (managers need this

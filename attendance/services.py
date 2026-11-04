@@ -10,7 +10,7 @@ from django.utils import timezone
 from rest_framework.exceptions import PermissionDenied, ValidationError
 
 from accounts.models import Role
-from geofence.services import find_containing_work_area
+from geofence.services import find_containing_work_area, find_containing_work_area_with_tolerance
 from notifications import services as notification_services
 
 from .models import AttendanceRecord, AttendanceSource, AttendanceStatus, BreakPeriod, OutdoorDutyRequest
@@ -21,8 +21,18 @@ class NotInWorkAreaError(ValidationError):
         super().__init__({"detail": "You must be inside an approved work area to check in."})
 
 
+# Allowance for GPS error when the app does not send its accuracy. Matches live tracking.
+CHECKIN_TOLERANCE_M = 15
+
+
 def _find_containing_work_area(employee, latitude, longitude):
-    return find_containing_work_area(employee.company_id, latitude, longitude, branch_id=employee.branch_id)
+    return find_containing_work_area_with_tolerance(
+        employee.company_id,
+        latitude,
+        longitude,
+        accuracy_meters=CHECKIN_TOLERANCE_M,
+        branch_id=employee.branch_id,
+    )
 
 
 def _get_employee_or_403(user):
@@ -154,6 +164,8 @@ def end_shift(user, latitude, longitude, source=AttendanceSource.MANUAL):
     work_area = _find_containing_work_area(employee, latitude, longitude)
 
     now = timezone.now()
+    # Close any open outside timer before checkout.
+    _end_outside(record, now)
     record.check_out_time = now
     record.check_out_latitude = latitude
     record.check_out_longitude = longitude
@@ -198,6 +210,9 @@ def process_geofence_event(user, event_type, latitude, longitude):
         if open_break is not None:
             _close_break(record, open_break, now)
             return record
+        if record.check_in_time is not None and record.check_out_time is None:
+            _end_outside(record, now)
+            return record
         return start_shift(user, latitude, longitude, source=AttendanceSource.AUTO_GEOFENCE)
 
     if event_type == "EXIT":
@@ -212,7 +227,8 @@ def process_geofence_event(user, event_type, latitude, longitude):
         if _is_within_break_window(record.shift or employee.shift, now):
             _start_break(record, now)
             return record
-        return end_shift(user, latitude, longitude, source=AttendanceSource.AUTO_GEOFENCE)
+        # Leaving the work area does NOT check out. Track the time outside instead.
+        return _start_outside(record, now)
 
     raise ValidationError({"event_type": "Must be 'ENTER' or 'EXIT'."})
 
@@ -321,3 +337,60 @@ def cancel_outdoor_duty(user, request_obj):
     request_obj.decided_at = timezone.now()
     request_obj.save(update_fields=["status", "decided_by", "decided_at", "updated_at"])
     return request_obj
+
+def auto_close_stale_shifts(max_hours, now=None):
+    """Close shifts left open longer than max_hours (missed checkout).
+    Checkout is set to check-in + max_hours and marked as SYSTEM."""
+    now = now or timezone.now()
+    cutoff = now - datetime.timedelta(hours=max_hours)
+    stale = AttendanceRecord.objects.select_related("shift").filter(
+        check_in_time__isnull=False,
+        check_out_time__isnull=True,
+        check_in_time__lt=cutoff,
+    )
+
+    closed = 0
+    for record in stale:
+        check_out = record.check_in_time + datetime.timedelta(hours=max_hours)
+        # Close any open outside timer before checkout.
+        _end_outside(record, check_out)
+        record.check_out_time = check_out
+        record.check_out_source = AttendanceSource.SYSTEM
+        record.working_minutes = max(0, int((check_out - record.check_in_time).total_seconds() // 60))
+        record.is_early_exit = False
+        record.early_exit_by_minutes = 0
+        half_day_threshold = record.shift.half_day_after_minutes if record.shift else 240
+        record.status = (
+            AttendanceStatus.HALF_DAY if record.working_minutes < half_day_threshold else AttendanceStatus.PRESENT
+        )
+        record.save()
+        notification_services.notify_shift_end(record)
+        closed += 1
+    return closed
+
+
+def _start_outside(record, when):
+    """Employee left a work area: start one outside period (once)."""
+    from .models import OutsideEvent
+
+    if record.outside_since is None:
+        record.outside_since = when
+        record.save(update_fields=["outside_since"])
+        OutsideEvent.objects.create(record=record, left_at=when)
+    return record
+
+
+def _end_outside(record, when):
+    """Employee is back inside, or checked out: close the open period and add it to the total."""
+    if record.outside_since is None:
+        return record
+    elapsed = max(0, int((when - record.outside_since).total_seconds() // 60))
+    open_event = record.outside_events.filter(returned_at__isnull=True).order_by("-left_at").first()
+    if open_event is not None:
+        open_event.returned_at = when
+        open_event.minutes = elapsed
+        open_event.save(update_fields=["returned_at", "minutes"])
+    record.outside_minutes = (record.outside_minutes or 0) + elapsed
+    record.outside_since = None
+    record.save(update_fields=["outside_minutes", "outside_since"])
+    return record

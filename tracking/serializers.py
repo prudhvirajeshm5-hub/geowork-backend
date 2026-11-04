@@ -7,11 +7,14 @@ from .services import current_shift_status
 class PingSerializer(serializers.Serializer):
     latitude = serializers.FloatField(min_value=-90, max_value=90)
     longitude = serializers.FloatField(min_value=-180, max_value=180)
-    accuracy_meters = serializers.FloatField(required=False, allow_null=True)
+    accuracy_meters = serializers.FloatField(
+        required=False, allow_null=True, min_value=0, max_value=10000
+    )
     battery_level = serializers.IntegerField(required=False, allow_null=True, min_value=0, max_value=100)
     gps_enabled = serializers.BooleanField(required=False, default=True)
     network_connected = serializers.BooleanField(required=False, default=True)
     recorded_at = serializers.DateTimeField(required=False, allow_null=True)
+    event_id = serializers.UUIDField(required=False, allow_null=True)
 
 
 class EmployeeLiveStatusSerializer(serializers.ModelSerializer):
@@ -62,3 +65,8 @@ class LocationPingSerializer(serializers.ModelSerializer):
             "recorded_at", "received_at",
         )
         read_only_fields = fields
+
+class HeartbeatSerializer(serializers.Serializer):
+    gps_enabled = serializers.BooleanField(default=True)
+    network_connected = serializers.BooleanField(default=True)
+    battery_level = serializers.IntegerField(required=False, allow_null=True, min_value=0, max_value=100)

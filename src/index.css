@@ -1,5 +1,5 @@
 /* ==========================================================================
-   Miracle 5 — design tokens
+   GeoWork Pro — design tokens
    Direction: "field-ops console" — a surveyor's palette (paper + deep pine
    teal boundary lines), Space Grotesk for structure, Inter for reading,
    IBM Plex Mono for anything that is data: codes, coordinates, timestamps.
@@ -18,12 +18,10 @@
   --line: #dde2dc;
   --line-strong: #c4ccc4;
 
-  /* Miracle 5 brand palette */
-  --brand: #2c3a56;
-  --brand-dark: #202a3f;
-  --brand-soft: #e7eaf0;
-  --brand-line: #4A90E2;
-  --brand-accent-gold: #ccab75;
+  --brand: #0f6e5c;
+  --brand-dark: #0b5347;
+  --brand-soft: #e2efe9;
+  --brand-line: #7fb8a8;
 
   --amber: #b1690f;
   --amber-soft: #faf0dd;
@@ -256,7 +254,7 @@ code,
 }
 
 .sidebar-link.active {
-  background: rgba(74, 144, 226, 0.35);
+  background: rgba(15, 110, 92, 0.35);
   color: #fff;
 }
 
@@ -268,7 +266,7 @@ code,
   transform: translateY(-50%);
   width: 8px;
   height: 8px;
-  border: 2px dashed #7EB6F5;
+  border: 2px dashed #6fd6b8;
   border-radius: 2px;
 }
 

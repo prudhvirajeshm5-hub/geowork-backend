@@ -1,0 +1,61 @@
+
+/* Earnings / Payroll (matches the GeoWork Pro payroll design). */
+.pr-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; margin-bottom: 16px; }
+.pr-controls { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.pr-controls .input { width: auto; min-width: 150px; height: 40px; }
+.pr-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-bottom: 16px; }
+.pr-stat { border-radius: 16px; padding: 16px; display: flex; gap: 12px; align-items: flex-start; border: 1px solid #e6ebf3; }
+.pr-stat-icon { width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center; flex: none; background: #fff; }
+.pr-stat-label { font-size: 12px; color: var(--ink-soft); }
+.pr-stat-value { font-size: 24px; font-weight: 800; color: var(--ink); line-height: 1.2; }
+.pr-stat-sub { font-size: 12px; color: var(--ink-faint); }
+.pr-tone-green { background: #eefaf3; }
+.pr-tone-blue { background: #eef5ff; }
+.pr-tone-amber { background: #fff8ec; }
+.pr-tone-red { background: #fdf1f0; }
+
+.pr-tabs { display: flex; gap: 28px; border-bottom: 1px solid #e6ebf3; margin-bottom: 16px; }
+.pr-tab { border: none; background: transparent; padding: 10px 2px 12px; color: var(--ink-soft); font-size: 14px; font-weight: 500; border-bottom: 2px solid transparent; cursor: pointer; }
+.pr-tab.on { color: var(--brand); font-weight: 700; border-bottom-color: var(--brand); }
+.pr-tab:focus { outline: none; }
+
+.pr-main { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 16px; align-items: start; }
+.pr-card { background: #fff; border: 1px solid #e6ebf3; border-radius: 16px; padding: 16px; box-shadow: var(--shadow-sm); min-width: 0; }
+.pr-filters { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 14px; }
+.pr-search { flex: 1 1 240px; display: flex; align-items: center; gap: 8px; height: 40px; padding: 0 12px; border: 1px solid #d7deea; border-radius: var(--radius); color: var(--ink-faint); }
+.pr-search input { flex: 1; border: none; outline: none; background: transparent; font-size: 14px; }
+.pr-filters select.input { width: auto; min-width: 140px; height: 40px; }
+.pr-table th { font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--ink-soft); background: #f6f8fb; }
+.pr-table td { padding: 12px; vertical-align: middle; }
+.pr-name { display: flex; align-items: center; gap: 10px; }
+.pr-avatar { width: 34px; height: 34px; border-radius: 50%; background: #14284b; color: #fff; font-size: 11px; font-weight: 700; display: inline-grid; place-items: center; flex: none; }
+.pr-sub { font-size: 12px; color: var(--ink-faint); }
+.pr-pill { display: inline-block; padding: 4px 11px; border-radius: 999px; font-size: 12px; font-weight: 700; }
+.pr-pill.ok { background: #e6f5ed; color: #1e8e5a; }
+.pr-pill.pending { background: #fdf3e1; color: #b86f10; }
+.pr-row-btn { width: 32px; height: 32px; border-radius: 10px; border: 1px solid #d7deea; background: #fff; display: inline-grid; place-items: center; cursor: pointer; color: var(--ink-soft); }
+.pr-row-btn.on { background: #14284b; border-color: #14284b; color: #fff; }
+.pr-footer { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 14px; }
+.pr-pager { display: flex; gap: 6px; align-items: center; }
+.pr-pg { min-width: 34px; height: 34px; border-radius: 10px; border: 1px solid #d7deea; background: #fff; color: var(--ink-soft); cursor: pointer; }
+.pr-pg.on { background: #14284b; border-color: #14284b; color: #fff; }
+.pr-pg:disabled { opacity: 0.45; cursor: default; }
+
+.pr-side-head { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+.pr-side-name { font-weight: 800; color: var(--ink); }
+.pr-net { background: #f1faf5; border-radius: 14px; padding: 14px; margin-bottom: 14px; }
+.pr-net-label { font-size: 12px; color: var(--ink-soft); }
+.pr-net-value { font-size: 24px; font-weight: 800; color: var(--ink); }
+.pr-facts { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
+.pr-fact { border: 1px solid #eef2f8; border-radius: 12px; padding: 10px; font-size: 12px; color: var(--ink-faint); }
+.pr-fact b { display: block; font-size: 14px; color: var(--ink); margin-top: 2px; }
+.pr-side-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.pr-side-actions button { height: 40px; border-radius: var(--radius); font-weight: 600; cursor: pointer; border: 1px solid #d7deea; background: #fff; color: var(--ink-soft); }
+.pr-side-actions button:disabled { opacity: 0.5; cursor: default; }
+
+.pr-note { padding: 28px; text-align: center; color: var(--ink-faint); }
+
+@media (max-width: 1200px) {
+  .pr-main { grid-template-columns: 1fr; }
+  .pr-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}

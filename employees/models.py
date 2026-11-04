@@ -38,6 +38,10 @@ class Employee(models.Model):
     photo = models.ImageField(upload_to=employee_photo_path, null=True, blank=True)
     date_of_joining = models.DateField(null=True, blank=True)
     date_of_exit = models.DateField(null=True, blank=True)
+    monthly_salary = models.DecimalField(
+        max_digits=12, decimal_places=2, null=True, blank=True,
+        help_text="Monthly salary used for payroll. Leave blank to exclude from pay.",
+    )
     address = models.TextField(blank=True)
     emergency_contact_name = models.CharField(max_length=150, blank=True)
     emergency_contact_phone = models.CharField(max_length=20, blank=True)

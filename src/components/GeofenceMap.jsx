@@ -1,46 +1,39 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { GoogleMap, Polygon, Circle, Rectangle, Marker, Polyline, useJsApiLoader } from "@react-google-maps/api";
+import { useEffect, useMemo, useState } from "react";
+import { GoogleMap, Polygon, Polyline, Marker, Circle, useJsApiLoader } from "@react-google-maps/api";
 
-// "geometry" is loaded for distance calculations (circle radius while
-// dragging) — the direct equivalent of Leaflet's L.latLng().distanceTo().
-const GOOGLE_MAPS_LIBRARIES = ["geometry"];
-
-const DEFAULT_CENTER = { lat: 18.5204, lng: 73.8567 }; // Pune — matches the backend admin map default
+const DEFAULT_CENTER = { lat: 18.5204, lng: 73.8567 }; // Pune
 const DEFAULT_ZOOM = 13;
+const GREEN = "#0F6E5C";
 
-const DOT_ICON = (color) => ({
-  path: "M -6,0 A 6,6 0 1,0 6,0 A 6,6 0 1,0 -6,0",
-  fillColor: color,
-  fillOpacity: 1,
-  strokeColor: "#fff",
-  strokeWeight: 2,
-  scale: 1,
-});
+// Same loader id and key as LiveTracking.jsx, so the Maps script loads only once.
+const MAP_LOADER_ID = "geowork-google-maps";
 
-function toLatLngs(points) {
+function toPath(points) {
   return (points || []).map((p) => ({ lat: p.latitude, lng: p.longitude }));
 }
 
+// Great-circle distance in meters (avoids needing the Google geometry library).
 function distanceMeters(a, b) {
-  if (!window.google?.maps?.geometry) return 0;
-  return window.google.maps.geometry.spherical.computeDistanceBetween(
-    new window.google.maps.LatLng(a.lat, a.lng),
-    new window.google.maps.LatLng(b.lat, b.lng)
-  );
+  const R = 6371000;
+  const toRad = (d) => (d * Math.PI) / 180;
+  const dLat = toRad(b.lat - a.lat);
+  const dLng = toRad(b.lng - a.lng);
+  const h =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(h));
 }
 
 export default function GeofenceMap({ workAreas, selectedId, onSelectArea, drawMode, onDrawFinalize, resetSignal }) {
-  const [drawPoints, setDrawPoints] = useState([]);
-  const [preview, setPreview] = useState(null);
-  const mapRef = useRef(null);
-
   const { isLoaded, loadError } = useJsApiLoader({
-    id: "geowork-google-maps",
+    id: MAP_LOADER_ID,
     googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "",
-    libraries: GOOGLE_MAPS_LIBRARIES,
   });
 
-  // Switching draw mode, cancelling, or a successful save should clear any in-progress shape.
+  const [drawPoints, setDrawPoints] = useState([]);
+  const [preview, setPreview] = useState(null);
+
+  // Switching draw mode, cancelling, or a successful save clears any in-progress shape.
   useEffect(() => {
     setDrawPoints([]);
     setPreview(null);
@@ -48,15 +41,10 @@ export default function GeofenceMap({ workAreas, selectedId, onSelectArea, drawM
 
   const center = useMemo(() => {
     const first = workAreas.find((w) => w.boundary_points?.length);
-    return first ? toLatLngs(first.boundary_points)[0] : DEFAULT_CENTER;
+    return first ? toPath(first.boundary_points)[0] : DEFAULT_CENTER;
   }, [workAreas]);
 
-  const onMapLoad = useCallback((map) => {
-    mapRef.current = map;
-  }, []);
-
-  const handleClick = (e) => {
-    const ll = { lat: e.latLng.lat(), lng: e.latLng.lng() };
+  const handleClick = (ll) => {
     if (drawMode === "POLYGON") {
       setDrawPoints((pts) => [...pts, ll]);
       return;
@@ -90,11 +78,6 @@ export default function GeofenceMap({ workAreas, selectedId, onSelectArea, drawM
     }
   };
 
-  const handleMouseMove = (e) => {
-    if (!drawMode || !e.latLng) return;
-    setPreview({ lat: e.latLng.lat(), lng: e.latLng.lng() });
-  };
-
   const finishPolygon = () => {
     if (drawPoints.length < 3) return;
     onDrawFinalize({
@@ -105,67 +88,71 @@ export default function GeofenceMap({ workAreas, selectedId, onSelectArea, drawM
 
   const undoPoint = () => setDrawPoints((pts) => pts.slice(0, -1));
 
-  const rectanglePreviewBounds = useMemo(() => {
-    if (drawMode !== "RECTANGLE" || drawPoints.length !== 1 || !preview) return null;
-    const a = drawPoints[0];
-    return {
-      south: Math.min(a.lat, preview.lat),
-      west: Math.min(a.lng, preview.lng),
-      north: Math.max(a.lat, preview.lat),
-      east: Math.max(a.lng, preview.lng),
-    };
-  }, [drawMode, drawPoints, preview]);
-
   if (loadError) {
     return (
-      <div className="map-shell" style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%" }}>
-        Map could not be loaded. Check the Google Maps API key configuration.
+      <div className="card" style={{ padding: 20 }}>
+        Couldn't load Google Maps. Check VITE_GOOGLE_MAPS_API_KEY and that the Maps JavaScript API is enabled.
       </div>
     );
+  }
+  if (!isLoaded) {
+    return <div className="card" style={{ padding: 20 }}>Loading map…</div>;
   }
 
-  if (!isLoaded) {
-    return (
-      <div className="map-shell" style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%" }}>
-        Loading map…
-      </div>
-    );
-  }
+  const pointIcon = {
+    path: window.google.maps.SymbolPath.CIRCLE,
+    scale: 6,
+    fillColor: GREEN,
+    fillOpacity: 1,
+    strokeColor: "#fff",
+    strokeWeight: 2,
+  };
+
+  const rectanglePath = (a, b) => {
+    const south = Math.min(a.lat, b.lat);
+    const north = Math.max(a.lat, b.lat);
+    const west = Math.min(a.lng, b.lng);
+    const east = Math.max(a.lng, b.lng);
+    return [
+      { lat: south, lng: west },
+      { lat: north, lng: west },
+      { lat: north, lng: east },
+      { lat: south, lng: east },
+    ];
+  };
+
+  const last = drawPoints[drawPoints.length - 1];
 
   return (
     <div style={{ position: "relative", height: "100%" }}>
       <GoogleMap
+        mapContainerStyle={{ width: "100%", height: "100%" }}
         center={center}
         zoom={DEFAULT_ZOOM}
-        mapContainerStyle={{ height: "100%", width: "100%" }}
-        mapContainerClassName="map-shell"
-        onLoad={onMapLoad}
-        onClick={drawMode ? handleClick : undefined}
-        onMouseMove={drawMode ? handleMouseMove : undefined}
-        options={{
-          streetViewControl: false,
-          mapTypeControl: true,
-          fullscreenControl: true,
-          zoomControl: true,
+        options={{ draggableCursor: drawMode ? "crosshair" : undefined, streetViewControl: false }}
+        onClick={(e) => {
+          if (drawMode) handleClick({ lat: e.latLng.lat(), lng: e.latLng.lng() });
+        }}
+        onMouseMove={(e) => {
+          if (drawMode) setPreview({ lat: e.latLng.lat(), lng: e.latLng.lng() });
         }}
       >
         {workAreas.map((wa) => {
+          const path = toPath(wa.boundary_points);
+          if (path.length < 3) return null;
           const isSelected = wa.id === selectedId;
-          const positions = toLatLngs(wa.boundary_points);
-          if (positions.length < 3) return null;
           return (
             <Polygon
               key={wa.id}
-              paths={positions}
+              paths={path}
+              onClick={() => onSelectArea?.(wa)}
               options={{
-                strokeColor: wa.color || "#4A90E2",
+                strokeColor: wa.color || GREEN,
                 strokeWeight: isSelected ? 3 : 1.5,
-                fillColor: wa.color || "#4A90E2",
+                fillColor: wa.color || GREEN,
                 fillOpacity: isSelected ? 0.28 : 0.1,
-                strokeOpacity: isSelected ? 1 : 0.6,
                 clickable: true,
               }}
-              onClick={() => onSelectArea?.(wa)}
             />
           );
         })}
@@ -174,30 +161,30 @@ export default function GeofenceMap({ workAreas, selectedId, onSelectArea, drawM
           <>
             <Polyline
               path={drawPoints}
-              options={{ strokeColor: "#4A90E2", strokeWeight: 2, strokeOpacity: 0.8 }}
+              options={{ strokeColor: GREEN, strokeWeight: 2, strokeOpacity: 1 }}
             />
             {drawPoints.length > 2 && (
               <Polyline
-                path={[drawPoints[drawPoints.length - 1], drawPoints[0]]}
-                options={{ strokeColor: "#4A90E2", strokeOpacity: 0.5, strokeWeight: 1.5 }}
+                path={[last, drawPoints[0]]}
+                options={{ strokeColor: GREEN, strokeWeight: 1.5, strokeOpacity: 0.5 }}
+              />
+            )}
+            {preview && (
+              <Polyline
+                path={[last, preview]}
+                options={{ strokeColor: GREEN, strokeWeight: 1.5, strokeOpacity: 0.5 }}
               />
             )}
             {drawPoints.map((p, i) => (
-              <Marker key={i} position={p} icon={DOT_ICON("#4A90E2")} />
+              <Marker key={i} position={p} icon={pointIcon} />
             ))}
-            {preview && (
-              <Polyline
-                path={[drawPoints[drawPoints.length - 1], preview]}
-                options={{ strokeColor: "#4A90E2", strokeOpacity: 0.5, strokeWeight: 1.5 }}
-              />
-            )}
           </>
         )}
 
-        {rectanglePreviewBounds && (
-          <Rectangle
-            bounds={rectanglePreviewBounds}
-            options={{ strokeColor: "#4A90E2", strokeWeight: 2, fillColor: "#4A90E2", fillOpacity: 0.12, clickable: false }}
+        {drawMode === "RECTANGLE" && drawPoints.length === 1 && preview && (
+          <Polygon
+            paths={rectanglePath(drawPoints[0], preview)}
+            options={{ strokeColor: GREEN, strokeWeight: 2, fillColor: GREEN, fillOpacity: 0.12, clickable: false }}
           />
         )}
 
@@ -205,7 +192,7 @@ export default function GeofenceMap({ workAreas, selectedId, onSelectArea, drawM
           <Circle
             center={drawPoints[0]}
             radius={distanceMeters(drawPoints[0], preview)}
-            options={{ strokeColor: "#4A90E2", strokeWeight: 2, fillColor: "#4A90E2", fillOpacity: 0.1, clickable: false }}
+            options={{ strokeColor: GREEN, strokeWeight: 2, fillColor: GREEN, fillOpacity: 0.1, clickable: false }}
           />
         )}
       </GoogleMap>

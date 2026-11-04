@@ -1,19 +1,12 @@
 import { useEffect, useState } from "react";
-import { Plus, Pencil, Building2 } from "lucide-react";
+import { Building2, Pencil, Plus, Search } from "lucide-react";
 import api, { apiErrorMessage } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { Alert, EmptyState, Field, Loading, Modal, StatusBadge } from "../components/ui";
+import "../company-setup.css";
 
 const TABS = ["Profile", "Branches", "Departments", "Designations", "Shifts"];
 const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-
-function slugify(value) {
-  return value
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/(^-|-$)/g, "");
-}
 
 export default function CompanySetup() {
   const [tab, setTab] = useState("Profile");
@@ -23,8 +16,8 @@ export default function CompanySetup() {
       <div className="page-head">
         <div>
           <div className="page-eyebrow">Module 2</div>
-          <h1>Company setup</h1>
-          <p className="page-sub">Branches, departments, designations and shift timing — the org structure everything else hangs off.</p>
+          <h1>Company Setup</h1>
+          <p className="page-sub">Manage your organisation structure and settings.</p>
         </div>
       </div>
 
@@ -48,204 +41,244 @@ export default function CompanySetup() {
 /* ---------------------------------- Profile ---------------------------------- */
 
 function ProfileTab() {
-  const { user, refreshUser } = useAuth();
-
-  // A user with no company yet (fresh ADMIN-role account, nothing set up
-  // in Django admin) sets up their company right here — no separate
-  // "assign company to user" step needed. See CompanyViewSet.perform_create.
-  if (!user?.company) {
-    return <CreateCompanyForm onCreated={refreshUser} />;
-  }
-
-  return <EditCompanyForm companyId={user.company} />;
-}
-
-function CreateCompanyForm({ onCreated }) {
+  const { user } = useAuth();
+  const [company, setCompany] = useState(null);
+  const [companies, setCompanies] = useState([]);
+  const [selectedCompanyId, setSelectedCompanyId] = useState("");
+  const [editing, setEditing] = useState(false);
   const [form, setForm] = useState({
     name: "",
-    slug: "",
+    registered_address: "",
+    gstin: "",
     contact_email: "",
     contact_phone: "",
-    gstin: "",
     timezone: "Asia/Kolkata",
-    registered_address: "",
   });
-  const [slugTouched, setSlugTouched] = useState(false);
-  const [error, setError] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-
-  const set = (k) => (e) => {
-    const value = e.target.value;
-    setForm((f) => ({
-      ...f,
-      [k]: value,
-      // Keep the slug in sync with the name until the person edits the
-      // slug field directly themselves.
-      slug: k === "name" && !slugTouched ? slugify(value) : f.slug,
-    }));
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setSubmitting(true);
-    setError("");
-    try {
-      await api.post("/company/companies/", form);
-      await onCreated();
-    } catch (err) {
-      setError(apiErrorMessage(err, "Couldn't set up the company."));
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  return (
-    <div className="card card-pad" style={{ maxWidth: 640 }}>
-      <div style={{ marginBottom: 16 }}>
-        <h3 style={{ margin: 0 }}>Set up your company</h3>
-        <p className="card-head-sub" style={{ marginTop: 4 }}>
-          This account isn't tied to a company yet. Fill this in once to get started — you'll be able to add branches, departments and shifts right after.
-        </p>
-      </div>
-      <form onSubmit={handleSubmit}>
-        <Alert>{error}</Alert>
-        <div className="form-grid">
-          <Field label="Company name">
-            <input className="input" required value={form.name} onChange={set("name")} />
-          </Field>
-          <Field label="Slug" hint="Used internally to identify your company">
-            <input
-              className="input"
-              required
-              value={form.slug}
-              onChange={(e) => {
-                setSlugTouched(true);
-                set("slug")(e);
-              }}
-            />
-          </Field>
-          <Field label="Contact email">
-            <input className="input" type="email" value={form.contact_email} onChange={set("contact_email")} />
-          </Field>
-          <Field label="Contact phone">
-            <input className="input" value={form.contact_phone} onChange={set("contact_phone")} />
-          </Field>
-          <Field label="GSTIN">
-            <input className="input" value={form.gstin} onChange={set("gstin")} />
-          </Field>
-          <Field label="Timezone">
-            <input className="input" value={form.timezone} onChange={set("timezone")} />
-          </Field>
-        </div>
-        <div className="form-grid cols-1" style={{ marginTop: 14 }}>
-          <Field label="Registered address">
-            <textarea className="input" value={form.registered_address} onChange={set("registered_address")} />
-          </Field>
-        </div>
-        <div className="form-actions" style={{ justifyContent: "flex-start" }}>
-          <button className="btn btn-primary" disabled={submitting}>
-            {submitting ? "Setting up…" : "Create company"}
-          </button>
-        </div>
-      </form>
-    </div>
-  );
-}
-
-function EditCompanyForm({ companyId }) {
-  const [company, setCompany] = useState(null);
-  const [form, setForm] = useState(null);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [saving, setSaving] = useState(false);
 
+  const fillForm = (data) => {
+    setCompany(data || null);
+    setForm({
+      name: data?.name || "",
+      registered_address: data?.registered_address || "",
+      gstin: data?.gstin || "",
+      contact_email: data?.contact_email || "",
+      contact_phone: data?.contact_phone || "",
+      timezone: data?.timezone || "Asia/Kolkata",
+    });
+    setSelectedCompanyId(data?.id ? String(data.id) : "");
+    setEditing(!data);
+  };
+
   useEffect(() => {
-    api
-      .get(`/company/companies/${companyId}/`)
-      .then(({ data }) => {
-        setCompany(data);
-        setForm(data);
-      })
-      .catch((err) => {
-        // Previously this had no .catch() at all: any failed request (403,
-        // 404, network error) left `form` as null forever, so the page was
-        // stuck on the loading spinner indefinitely with zero indication
-        // anything had gone wrong.
-        setError(apiErrorMessage(err, "Couldn't load the company profile."));
-      });
-  }, [companyId]);
+    let cancelled = false;
+    async function loadCompany() {
+      setLoading(true);
+      setError("");
+      try {
+        if (user?.company) {
+          const { data } = await api.get(`/company/companies/${user.company}/`);
+          if (!cancelled) {
+            setCompanies([data]);
+            fillForm(data);
+            setEditing(false);
+          }
+        } else {
+          // Platform superusers may have existing companies even when their
+          // own account is not assigned to a tenant. Load those instead of
+          // showing an empty registration form and hiding existing details.
+          const { data } = await api.get("/company/companies/", { params: { page_size: 200 } });
+          const list = Array.isArray(data) ? data : (data.results || []);
+          if (!cancelled) {
+            setCompanies(list);
+            if (list.length === 1) {
+              fillForm(list[0]);
+              setEditing(false);
+            } else if (list.length > 1) {
+              // Avoid silently editing the wrong tenant when a platform admin
+              // has access to multiple companies.
+              const first = list[0];
+              fillForm(first);
+              setEditing(false);
+            } else {
+              fillForm(null);
+              setEditing(true);
+            }
+          }
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setError(apiErrorMessage(err, "Could not load company details."));
+          fillForm(null);
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+    loadCompany();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.company, user?.email, user?.phone]);
 
-  const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
+  const set = (key) => (event) => setForm((current) => ({ ...current, [key]: event.target.value }));
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const chooseCompany = (event) => {
+    const id = event.target.value;
+    setSelectedCompanyId(id);
+    const selected = companies.find((item) => String(item.id) === id);
+    if (selected) {
+      fillForm(selected);
+      setEditing(false);
+      setError("");
+      setSuccess("");
+    }
+  };
+
+  const handleSubmit = async (event) => {
+    event.preventDefault();
     setSaving(true);
     setError("");
     setSuccess("");
+
+    const companyName = form.name.trim();
+    const generatedSlug = companyName
+      .toLowerCase()
+      .normalize("NFKD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "");
+    const payload = {
+      name: companyName,
+      slug: generatedSlug,
+      registered_address: form.registered_address.trim(),
+      gstin: form.gstin.trim(),
+      contact_email: form.contact_email.trim(),
+      contact_phone: form.contact_phone.trim(),
+      timezone: form.timezone.trim() || "Asia/Kolkata",
+    };
+
     try {
-      const { data } = await api.patch(`/company/companies/${company.id}/`, {
-        name: form.name,
-        registered_address: form.registered_address,
-        gstin: form.gstin,
-        contact_email: form.contact_email,
-        contact_phone: form.contact_phone,
-        timezone: form.timezone,
-      });
-      setCompany(data);
-      setForm(data);
-      setSuccess("Company profile updated.");
+      let data;
+      if (company?.id) {
+        const response = await api.patch(`/company/companies/${company.id}/`, payload);
+        data = response.data;
+        setSuccess("Company profile updated successfully.");
+      } else {
+        const response = await api.post("/company/companies/", payload);
+        data = response.data;
+        setSuccess("Company registered successfully.");
+        setCompanies((current) => [...current, data]);
+      }
+      fillForm(data);
+      setEditing(false);
     } catch (err) {
-      setError(apiErrorMessage(err, "Couldn't save the company profile."));
+      setError(apiErrorMessage(err, company?.id ? "Couldn't update the company profile." : "Couldn't register the company."));
     } finally {
       setSaving(false);
     }
   };
 
-  if (!form && !error) return <Loading label="Loading company profile…" />;
-  if (!form && error) {
-    return (
-      <div className="card card-pad" style={{ maxWidth: 640 }}>
-        <Alert>{error}</Alert>
-      </div>
-    );
-  }
+  if (loading) return <Loading label="Loading company profile…" />;
+
+  const hasMultipleCompanies = !user?.company && companies.length > 1;
 
   return (
-    <div className="card card-pad" style={{ maxWidth: 640 }}>
-      <form onSubmit={handleSubmit}>
-        <Alert>{error}</Alert>
-        {success && <Alert tone="info">{success}</Alert>}
-        <div className="form-grid">
-          <Field label="Company name">
-            <input className="input" required value={form.name || ""} onChange={set("name")} />
-          </Field>
-          <Field label="Plan" hint="Managed by Miracle 5">
-            <input className="input" value={form.plan || ""} disabled />
-          </Field>
-          <Field label="Contact email">
-            <input className="input" type="email" value={form.contact_email || ""} onChange={set("contact_email")} />
-          </Field>
-          <Field label="Contact phone">
-            <input className="input" value={form.contact_phone || ""} onChange={set("contact_phone")} />
-          </Field>
-          <Field label="GSTIN">
-            <input className="input" value={form.gstin || ""} onChange={set("gstin")} />
-          </Field>
-          <Field label="Timezone">
-            <input className="input" value={form.timezone || ""} onChange={set("timezone")} />
-          </Field>
+    <div className="card card-pad cp-card">
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
+        <div>
+          <h2 style={{ marginTop: 0 }}>{company ? "Company Profile" : "Register your company"}</h2>
+          <p className="page-sub">
+            {company ? "Your registered company information and contact details." : "Enter your company details to set up your GeoWork Pro workspace."}
+          </p>
         </div>
-        <div className="form-grid cols-1" style={{ marginTop: 14 }}>
-          <Field label="Registered address">
-            <textarea className="input" value={form.registered_address || ""} onChange={set("registered_address")} />
-          </Field>
-        </div>
-        <div className="form-actions" style={{ justifyContent: "flex-start" }}>
-          <button className="btn btn-primary" disabled={saving}>
-            {saving ? "Saving…" : "Save changes"}
+        {company && !editing && (
+          <button type="button" className="btn btn-primary" onClick={() => { setEditing(true); setError(""); setSuccess(""); }}>
+            <Pencil size={14} /> Edit Profile
           </button>
+        )}
+      </div>
+
+      {hasMultipleCompanies && (
+        <div style={{ marginBottom: 16, maxWidth: 420 }}>
+          <Field label="Company to view or edit">
+            <select className="input" value={selectedCompanyId} onChange={chooseCompany}>
+              {companies.map((item) => <option key={item.id} value={String(item.id)}>{item.name}</option>)}
+            </select>
+          </Field>
+          <p className="page-sub">Your platform admin account can access multiple companies. Choose the correct company before editing.</p>
         </div>
-      </form>
+      )}
+
+      <Alert>{error}</Alert>
+      {success && <Alert tone="info">{success}</Alert>}
+
+      {!editing && company ? (
+        <div className="cp-layout">
+          <div className="cp-logo">
+            <div className="cp-logo-mark">
+              <Building2 size={36} />
+            </div>
+            <button type="button" className="cp-logo-btn" disabled title="Logo upload is not available yet">
+              Change Logo
+            </button>
+            <div className="cp-hint">JPG, PNG (Max 2MB)</div>
+          </div>
+          <div className="cp-fields">
+            <div className="form-grid">
+              <Field label="Company Name *"><input className="input" value={company.name || ""} readOnly /></Field>
+              <Field label="Company Slug *"><input className="input" value={company.slug || ""} readOnly /></Field>
+              <Field label="Contact Email *"><input className="input" value={company.contact_email || ""} readOnly /></Field>
+              <Field label="Contact Phone *"><input className="input" value={company.contact_phone || ""} readOnly /></Field>
+              <Field label="GSTIN"><input className="input" value={company.gstin || ""} readOnly /></Field>
+              <Field label="Timezone"><input className="input" value={company.timezone || "Asia/Kolkata"} readOnly /></Field>
+              <div className="cp-full">
+                <Field label="Registered Address *">
+                  <textarea className="input" rows={4} value={company.registered_address || ""} readOnly />
+                </Field>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <form onSubmit={handleSubmit}>
+          <div className="form-grid">
+            <Field label="Company name">
+              <input className="input" required maxLength={255} placeholder="Enter registered company name" value={form.name} onChange={set("name")} />
+            </Field>
+            <Field label="Contact phone">
+              <input className="input" type="tel" placeholder="+91 98765 43210" value={form.contact_phone} onChange={set("contact_phone")} />
+            </Field>
+            <Field label="Contact email">
+              <input className="input" type="email" placeholder="admin@company.com" value={form.contact_email} onChange={set("contact_email")} />
+            </Field>
+            <Field label="GSTIN">
+              <input className="input" maxLength={20} placeholder="GST identification number (optional)" value={form.gstin} onChange={set("gstin")} />
+            </Field>
+            <Field label="Timezone">
+              <select className="input" value={form.timezone} onChange={set("timezone")}>
+                <option value="Asia/Kolkata">India (Asia/Kolkata)</option>
+                <option value="UTC">UTC</option>
+                <option value="Asia/Dubai">Dubai (Asia/Dubai)</option>
+                <option value="Asia/Singapore">Singapore (Asia/Singapore)</option>
+                <option value="Europe/London">London (Europe/London)</option>
+                <option value="America/New_York">New York (America/New_York)</option>
+              </select>
+            </Field>
+            <Field label="Registered address">
+              <textarea className="input" rows={3} placeholder="Enter registered office address" value={form.registered_address} onChange={set("registered_address")} />
+            </Field>
+          </div>
+          <div className="form-actions" style={{ justifyContent: "flex-start", gap: 8 }}>
+            <button type="submit" className="btn btn-primary" disabled={saving}>
+              {saving ? "Saving…" : company ? "Save changes" : "Register company"}
+            </button>
+            {company && <button type="button" className="btn btn-secondary" onClick={() => { fillForm(company); setEditing(false); setError(""); }}>Cancel</button>}
+          </div>
+        </form>
+      )}
     </div>
   );
 }
@@ -257,6 +290,8 @@ function BranchesTab() {
   const [error, setError] = useState("");
   const [editing, setEditing] = useState(null);
   const [creating, setCreating] = useState(false);
+  const [query, setQuery] = useState("");
+  const [status, setStatus] = useState("");
 
   const load = () =>
     api
@@ -268,53 +303,110 @@ function BranchesTab() {
     load();
   }, []);
 
+  const all = rows || [];
+  const activeCount = all.filter((b) => b.is_active).length;
+  const inactiveCount = all.length - activeCount;
+  const q = query.trim().toLowerCase();
+  const shown = all.filter((b) => {
+    const hit = !q || [b.name, b.code, b.city].some((v) => String(v || "").toLowerCase().includes(q));
+    const st = !status || (status === "active" ? b.is_active : !b.is_active);
+    return hit && st;
+  });
+
+  const stat = (label, value, tone) => (
+    <div className="cs-stat">
+      <span className={`cs-stat-icon cs-tone-${tone}`}>
+        <Building2 size={18} />
+      </span>
+      <div>
+        <div className="cs-stat-label">{label}</div>
+        <div className="cs-stat-value">{value}</div>
+      </div>
+    </div>
+  );
+
   return (
-    <div className="card">
-      <div className="table-toolbar">
-        <span className="card-head-sub">{rows?.length ?? 0} branches</span>
-        <button className="btn btn-primary btn-sm" onClick={() => setCreating(true)}>
-          <Plus size={14} /> Add branch
+    <div>
+      <div className="cs-tab-head">
+        <div>
+          <h2 className="cs-tab-title">Branches</h2>
+          <p className="cs-tab-sub">Manage all your company branches and locations.</p>
+        </div>
+        <button className="btn btn-primary" onClick={() => setCreating(true)}>
+          <Plus size={15} /> Add Branch
         </button>
       </div>
-      <Alert>{error}</Alert>
-      {rows === null ? (
-        <Loading />
-      ) : rows.length === 0 ? (
-        <EmptyState icon={Building2} title="No branches yet" message="Add your first site or office to start assigning employees to it." />
-      ) : (
-        <div className="table-wrap">
-          <table className="data">
-            <thead>
-              <tr>
-                <th>Name</th>
-                <th>Code</th>
-                <th>City</th>
-                <th>State</th>
-                <th>Status</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((b) => (
-                <tr key={b.id}>
-                  <td className="cell-primary">{b.name}</td>
-                  <td className="mono">{b.code || "—"}</td>
-                  <td>{b.city || "—"}</td>
-                  <td>{b.state || "—"}</td>
-                  <td>
-                    <StatusBadge tone={b.is_active ? "green" : "slate"}>{b.is_active ? "Active" : "Inactive"}</StatusBadge>
-                  </td>
-                  <td>
-                    <button className="btn btn-sm btn-icon" onClick={() => setEditing(b)}>
-                      <Pencil size={14} />
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+
+      <div className="cs-stats">
+        {stat("Total Branches", all.length, "blue")}
+        {stat("Active Branches", activeCount, "green")}
+        {stat("Inactive Branches", inactiveCount, "red")}
+      </div>
+
+      <div className="card cs-card">
+        <Alert>{error}</Alert>
+        <div className="cs-filters">
+          <div className="cs-search">
+            <Search size={15} />
+            <input
+              placeholder="Search branch name, code or city..."
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+            />
+          </div>
+          <select className="input" value={status} onChange={(e) => setStatus(e.target.value)}>
+            <option value="">All Status</option>
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+          </select>
         </div>
-      )}
+
+        {rows === null ? (
+          <Loading />
+        ) : all.length === 0 ? (
+          <EmptyState icon={Building2} title="No branches yet" message="Add your first site or office to start assigning employees to it." />
+        ) : (
+          <>
+            <div className="table-wrap">
+              <table className="data">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Branch Name</th>
+                    <th>Branch Code</th>
+                    <th>City</th>
+                    <th>State</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {shown.map((b, i) => (
+                    <tr key={b.id}>
+                      <td>{i + 1}</td>
+                      <td className="cell-primary">{b.name}</td>
+                      <td className="mono">{b.code || "—"}</td>
+                      <td>{b.city || "—"}</td>
+                      <td>{b.state || "—"}</td>
+                      <td>
+                        <StatusBadge tone={b.is_active ? "green" : "slate"}>{b.is_active ? "Active" : "Inactive"}</StatusBadge>
+                      </td>
+                      <td>
+                        <button className="btn btn-sm btn-icon" title="Edit" onClick={() => setEditing(b)}>
+                          <Pencil size={14} />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="cs-footer">
+              Showing {shown.length} of {all.length} branches
+            </div>
+          </>
+        )}
+      </div>
 
       {(creating || editing) && (
         <BranchModal
@@ -422,10 +514,13 @@ function DepartmentsTab() {
 
   return (
     <div className="card">
-      <div className="table-toolbar">
-        <span className="card-head-sub">{rows?.length ?? 0} departments</span>
-        <button className="btn btn-primary btn-sm" onClick={() => setCreating(true)}>
-          <Plus size={14} /> Add department
+      <div className="cs-tab-head">
+        <div>
+          <h2 className="cs-tab-title">Departments</h2>
+          <p className="cs-tab-sub">Manage departments within your organisation.</p>
+        </div>
+        <button className="btn btn-primary" onClick={() => setCreating(true)}>
+          <Plus size={15} /> Add department
         </button>
       </div>
       <Alert>{error}</Alert>
@@ -463,6 +558,7 @@ function DepartmentsTab() {
           </table>
         </div>
       )}
+      <div className="cs-footer">Showing {rows?.length ?? 0} departments</div>
       {(creating || editing) && (
         <DepartmentModal
           department={editing}
@@ -561,10 +657,13 @@ function DesignationsTab() {
 
   return (
     <div className="card">
-      <div className="table-toolbar">
-        <span className="card-head-sub">{rows?.length ?? 0} designations</span>
-        <button className="btn btn-primary btn-sm" onClick={() => setCreating(true)}>
-          <Plus size={14} /> Add designation
+      <div className="cs-tab-head">
+        <div>
+          <h2 className="cs-tab-title">Designations</h2>
+          <p className="cs-tab-sub">Manage employee designations and hierarchy levels.</p>
+        </div>
+        <button className="btn btn-primary" onClick={() => setCreating(true)}>
+          <Plus size={15} /> Add designation
         </button>
       </div>
       <Alert>{error}</Alert>
@@ -604,6 +703,7 @@ function DesignationsTab() {
           </table>
         </div>
       )}
+      <div className="cs-footer">Showing {rows?.length ?? 0} designations</div>
       {(creating || editing) && (
         <DesignationModal
           designation={editing}
@@ -700,10 +800,13 @@ function ShiftsTab() {
 
   return (
     <div className="card">
-      <div className="table-toolbar">
-        <span className="card-head-sub">{rows?.length ?? 0} shifts</span>
-        <button className="btn btn-primary btn-sm" onClick={() => setCreating(true)}>
-          <Plus size={14} /> Add shift
+      <div className="cs-tab-head">
+        <div>
+          <h2 className="cs-tab-title">Shifts</h2>
+          <p className="cs-tab-sub">Manage working shifts and timing for your organisation.</p>
+        </div>
+        <button className="btn btn-primary" onClick={() => setCreating(true)}>
+          <Plus size={15} /> Add shift
         </button>
       </div>
       <Alert>{error}</Alert>
@@ -765,6 +868,7 @@ function ShiftsTab() {
           </table>
         </div>
       )}
+      <div className="cs-footer">Showing {rows?.length ?? 0} shifts</div>
       {(creating || editing) && (
         <ShiftModal
           shift={editing}
