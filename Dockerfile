@@ -14,4 +14,4 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 RUN python manage.py collectstatic --noinput
 
-CMD sh -c "python manage.py migrate --noinput && gunicorn geowork_backend.wsgi:application --bind 0.0.0.0:${PORT:-10000} --workers 3 --timeout 120"
+CMD ["sh", "start.sh"]
