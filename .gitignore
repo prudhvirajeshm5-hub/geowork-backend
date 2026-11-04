@@ -6,3 +6,5 @@ dist/
 .env
 venv312/
 staticfiles/
+.env.production
+.env*
