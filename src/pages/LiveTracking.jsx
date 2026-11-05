@@ -6,6 +6,7 @@ import api, { apiErrorMessage } from "../lib/api";
 import { initials } from "../lib/format";
 import { Alert, Loading } from "../components/ui";
 import "./live-tracking.css";
+import WorkAreaLayer, { useWorkAreas } from "../components/WorkAreaLayer";
 
 const MAPS_OPTIONS = { id: "geowork-maps", googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY };
 const DEFAULT_CENTER = { lat: 18.5204, lng: 73.8567 };
@@ -67,6 +68,8 @@ function StatCard({ label, value, sub, tone, Icon }) {
 export default function LiveTracking() {
   const { isLoaded, loadError } = useJsApiLoader(MAPS_OPTIONS);
   const [branches, setBranches] = useState([]);
+  const [showGeofences, setShowGeofences] = useState(true);
+  const { areas: workAreas } = useWorkAreas(branches);
   const [branchId, setBranchId] = useState("");
   const [live, setLive] = useState([]);
   const [areas, setAreas] = useState([]);
@@ -209,6 +212,7 @@ export default function LiveTracking() {
             />
           );
         })}
+      <WorkAreaLayer areas={workAreas} visible={showGeofences} />
       </GoogleMap>
     );
   };
