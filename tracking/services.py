@@ -61,6 +61,44 @@ def _debounce_seconds_for(new_work_area_id):
     )
 
 
+def _distance_m(lat1, lng1, lat2, lng2):
+    """Great-circle distance in metres."""
+    import math
+
+    r = 6371000.0
+    p1, p2 = math.radians(lat1), math.radians(lat2)
+    dp = p2 - p1
+    dl = math.radians(lng2 - lng1)
+    a = math.sin(dp / 2) ** 2 + math.cos(p1) * math.cos(p2) * math.sin(dl / 2) ** 2
+    return 2 * r * math.asin(math.sqrt(a))
+
+
+def _should_reject_fix(live_status, latitude, longitude, accuracy_meters, recorded_at):
+    """
+    True for a fix that must not be stored: too inaccurate to trust, or implying an
+    impossible jump from the last accepted position (e.g. 1.5 km in 20 seconds).
+    The jump check only applies within 10 minutes of the last accepted fix, so a long
+    gap (phone offline, device restarted) can never lock the tracker out.
+    """
+    max_store = getattr(settings, "GEOFENCE_MAX_STORE_ACCURACY_M", 100)
+    if accuracy_meters is not None and accuracy_meters > max_store:
+        return True
+
+    prev = live_status.last_location
+    prev_time = live_status.last_ping_at
+    if prev is None or prev_time is None:
+        return False
+
+    gap = (recorded_at - prev_time).total_seconds()
+    if gap <= 0 or gap > 600:
+        return False
+
+    dist = _distance_m(prev.y, prev.x, float(latitude), float(longitude))
+    if dist < getattr(settings, "GPS_JUMP_MIN_DISTANCE_M", 150):
+        return False
+    return dist / max(gap, 1.0) > getattr(settings, "GPS_MAX_SPEED_MPS", 40)
+
+
 def process_ping(
     user,
     latitude,
@@ -153,6 +191,13 @@ def process_ping(
             accuracy_meters=accuracy_meters,
             branch_id=employee.branch_id,
         )
+
+        # Reject inaccurate or impossible fixes before saving. They never reach
+        # the history or the live position.
+        if _should_reject_fix(live_status, latitude, longitude, accuracy_meters, recorded_at):
+            live_status.last_contact_at = now
+            live_status.save(update_fields=["last_contact_at"])
+            return live_status, None
 
         try:
             # Savepoint allows safe recovery from a duplicate event ID.
