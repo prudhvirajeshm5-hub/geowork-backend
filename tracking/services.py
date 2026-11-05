@@ -73,12 +73,29 @@ def _distance_m(lat1, lng1, lat2, lng2):
     return 2 * r * math.asin(math.sqrt(a))
 
 
-def _should_reject_fix(live_status, latitude, longitude, accuracy_meters, recorded_at):
+def _on_approved_outdoor_duty(employee_id, when):
+    """True when the employee has an approved outdoor-duty request covering that day."""
+    from attendance.models import OutdoorDutyRequest
+
+    day = timezone.localtime(when).date()
+    return OutdoorDutyRequest.objects.filter(
+        employee_id=employee_id,
+        status=OutdoorDutyRequest.Status.APPROVED,
+        start_date__lte=day,
+        end_date__gte=day,
+    ).exists()
+
+
+def _should_reject_fix(live_status, latitude, longitude, accuracy_meters, recorded_at, outdoor=False):
     """
-    True for a fix that must not be stored: too inaccurate to trust, or implying an
-    impossible jump from the last accepted position (e.g. 1.5 km in 20 seconds).
-    The jump check only applies within 10 minutes of the last accepted fix, so a long
-    gap (phone offline, device restarted) can never lock the tracker out.
+    True for a fix that must not be stored.
+
+    - Too inaccurate (worse than GEOFENCE_MAX_STORE_ACCURACY_M): rejected.
+    - Too far from the last accepted fix for the time elapsed: rejected.
+      On foot the allowance is max(10 m, 3 m/s x seconds). During approved
+      outdoor duty it is max(10 m, 25 m/s x seconds), so vehicle travel works.
+    Only applies within 10 minutes of the last accepted fix, so a long gap
+    (phone offline, device restarted) can never lock the tracker out.
     """
     max_store = getattr(settings, "GEOFENCE_MAX_STORE_ACCURACY_M", 100)
     if accuracy_meters is not None and accuracy_meters > max_store:
@@ -93,10 +110,14 @@ def _should_reject_fix(live_status, latitude, longitude, accuracy_meters, record
     if gap <= 0 or gap > 600:
         return False
 
+    if outdoor:
+        speed = getattr(settings, "GPS_OUTDOOR_MAX_SPEED_MPS", 25)
+    else:
+        speed = getattr(settings, "GPS_WALK_SPEED_MPS", 3)
+    allowed = max(getattr(settings, "GPS_MIN_ALLOWANCE_M", 10), speed * gap)
+
     dist = _distance_m(prev.y, prev.x, float(latitude), float(longitude))
-    if dist < getattr(settings, "GPS_JUMP_MIN_DISTANCE_M", 150):
-        return False
-    return dist / max(gap, 1.0) > getattr(settings, "GPS_MAX_SPEED_MPS", 40)
+    return dist > allowed
 
 
 def process_ping(
@@ -194,7 +215,8 @@ def process_ping(
 
         # Reject inaccurate or impossible fixes before saving. They never reach
         # the history or the live position.
-        if _should_reject_fix(live_status, latitude, longitude, accuracy_meters, recorded_at):
+        outdoor = _on_approved_outdoor_duty(employee.id, recorded_at)
+        if _should_reject_fix(live_status, latitude, longitude, accuracy_meters, recorded_at, outdoor=outdoor):
             live_status.last_contact_at = now
             live_status.save(update_fields=["last_contact_at"])
             return live_status, None

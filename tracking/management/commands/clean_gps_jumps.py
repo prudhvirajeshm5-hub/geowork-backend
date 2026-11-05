@@ -4,7 +4,7 @@ from django.core.management.base import BaseCommand
 from django.utils import timezone
 
 from tracking.models import LocationPing
-from tracking.services import _should_reject_fix
+from tracking.services import _on_approved_outdoor_duty, _should_reject_fix
 
 
 class _Track:
@@ -38,7 +38,8 @@ class Command(BaseCommand):
         for ping in pings.iterator():
             track = tracks.setdefault(ping.employee_id, _Track())
             lat, lng = ping.location.y, ping.location.x
-            if _should_reject_fix(track, lat, lng, ping.accuracy_meters, ping.recorded_at):
+            outdoor = _on_approved_outdoor_duty(ping.employee_id, ping.recorded_at)
+            if _should_reject_fix(track, lat, lng, ping.accuracy_meters, ping.recorded_at, outdoor=outdoor):
                 bad_ids.append(ping.id)
                 continue
             track.last_location = ping.location
