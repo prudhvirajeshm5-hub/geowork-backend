@@ -59,6 +59,41 @@ class RegisterSerializer(serializers.ModelSerializer):
         return user
 
 
+class CompanyRegisterSerializer(serializers.Serializer):
+    """Company + first admin details for public self-signup. Never accepts a role."""
+
+    company_name = serializers.CharField(max_length=150)
+    gstin = serializers.CharField(max_length=15, required=False, allow_blank=True)
+    contact_email = serializers.EmailField(required=False, allow_blank=True)
+    contact_phone = serializers.CharField(max_length=20, required=False, allow_blank=True)
+    timezone = serializers.CharField(max_length=64, required=False, allow_blank=True, default="Asia/Kolkata")
+    registered_address = serializers.CharField(required=False, allow_blank=True)
+
+    first_name = serializers.CharField(max_length=150)
+    last_name = serializers.CharField(max_length=150, required=False, allow_blank=True)
+    phone = serializers.CharField(max_length=20)
+    email = serializers.EmailField(required=False, allow_blank=True)
+    password = serializers.CharField(write_only=True, validators=[validate_password])
+
+    def validate_company_name(self, value):
+        value = value.strip()
+        if not value:
+            raise serializers.ValidationError("Enter the company name.")
+        return value
+
+    def validate_gstin(self, value):
+        value = value.strip().upper()
+        if value and len(value) != 15:
+            raise serializers.ValidationError("GSTIN must be 15 characters.")
+        return value
+
+    def validate_phone(self, value):
+        value = value.strip()
+        if User.objects.filter(phone=value).exists():
+            raise serializers.ValidationError("An account with this phone number already exists. Sign in instead.")
+        return value
+
+
 class PasswordLoginSerializer(serializers.Serializer):
     phone = serializers.CharField()
     password = serializers.CharField(write_only=True)

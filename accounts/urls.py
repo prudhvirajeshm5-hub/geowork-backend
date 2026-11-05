@@ -7,6 +7,7 @@ app_name = "accounts"
 
 urlpatterns = [
     path("register/", views.RegisterView.as_view(), name="register"),
+    path("register-company/", views.RegisterCompanyView.as_view(), name="register-company"),
     path("login/", views.PasswordLoginView.as_view(), name="login-password"),
     path("login/otp/request/", views.OTPRequestView.as_view(), name="login-otp-request"),
     path("login/otp/verify/", views.OTPLoginVerifyView.as_view(), name="login-otp-verify"),

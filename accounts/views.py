@@ -40,12 +40,74 @@ def send_otp_sms(phone, code, purpose):
 
 
 class RegisterView(APIView):
+    """Public role-choosing signup is closed. See RegisterCompanyView."""
+
     permission_classes = [AllowAny]
 
     def post(self, request):
-        serializer = RegisterSerializer(data=request.data)
+        return Response(
+            {"detail": "Create your company at /register, or ask your company admin to add you."},
+            status=status.HTTP_403_FORBIDDEN,
+        )
+
+
+class RegisterCompanyView(APIView):
+    """
+    Public self-signup. Creates a NEW company and its first ADMIN user in one
+    transaction, so a company can never exist without its admin or the reverse.
+    Managers and employees are never self-registered; a company admin adds them
+    from inside their own company.
+    """
+
+    permission_classes = [AllowAny]
+    throttle_classes = [OTPThrottle]
+
+    def post(self, request):
+        from companies.models import Company
+        from django.db import transaction
+        from django.utils.text import slugify
+        from .models import Role
+        from .serializers import CompanyRegisterSerializer
+
+        serializer = CompanyRegisterSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        user = serializer.save()
+        data = serializer.validated_data
+
+        company_fields = {f.name for f in Company._meta.fields}
+        company_values = {
+            "name": data["company_name"],
+            "gstin": data.get("gstin", ""),
+            "registered_address": data.get("registered_address", ""),
+            "contact_email": data.get("contact_email", ""),
+            "contact_phone": data.get("contact_phone", ""),
+            "timezone": data.get("timezone") or "Asia/Kolkata",
+        }
+
+        with transaction.atomic():
+            base = slugify(data["company_name"])[:50] or "company"
+            slug, n = base, 2
+            while Company.objects.filter(slug=slug).exists():
+                slug = f"{base}-{n}"
+                n += 1
+            if "slug" in company_fields:
+                company_values["slug"] = slug
+
+            company = Company.objects.create(
+                **{k: v for k, v in company_values.items() if k in company_fields}
+            )
+
+            user = User(
+                phone=data["phone"],
+                email=data.get("email", ""),
+                first_name=data["first_name"],
+                last_name=data.get("last_name", ""),
+                role=Role.ADMIN,
+                company=company,
+                must_change_password=False,
+            )
+            user.set_password(data["password"])
+            user.save()
+
         return Response(
             {"user": UserSerializer(user).data, **tokens_for_user(user)},
             status=status.HTTP_201_CREATED,
