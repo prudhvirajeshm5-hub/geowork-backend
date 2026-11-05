@@ -98,7 +98,7 @@ class RegisterCompanyView(APIView):
 
             user = User(
                 phone=data["phone"],
-                email=data.get("email", ""),
+                email=data.get("email") or None,
                 first_name=data["first_name"],
                 last_name=data.get("last_name", ""),
                 role=Role.ADMIN,
