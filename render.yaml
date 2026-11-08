@@ -1,6 +1,6 @@
 databases:
   - name: geowork-db
-    plan: <database plan name>
+    plan: 0.1c-256mb
     databaseName: geowork
     user: geowork
 
