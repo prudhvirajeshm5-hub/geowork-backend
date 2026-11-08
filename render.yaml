@@ -1,6 +1,6 @@
 databases:
   - name: geowork-db
-    plan: free
+    plan: DATABASE_PLAN_NAME
     databaseName: geowork
     user: geowork
 
@@ -8,7 +8,7 @@ services:
   - type: web
     name: geowork-backend
     runtime: docker
-    plan: free
+    plan: WEB_PLAN_NAME
     healthCheckPath: /admin/login/
     envVars:
       - key: DATABASE_URL
