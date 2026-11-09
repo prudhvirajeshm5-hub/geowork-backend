@@ -154,6 +154,25 @@ STORAGES = {
     "staticfiles": {"BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage"},
 }
 
+# R2 storage block: photos go to Cloudflare R2 when the bucket variable is set.
+# Local development keeps the default file storage when it is not set.
+if os.environ.get("AWS_STORAGE_BUCKET_NAME"):
+    STORAGES["default"] = {
+        "BACKEND": "storages.backends.s3.S3Storage",
+        "OPTIONS": {
+            "bucket_name": os.environ["AWS_STORAGE_BUCKET_NAME"],
+            "endpoint_url": os.environ["AWS_S3_ENDPOINT_URL"],
+            "access_key": os.environ["AWS_ACCESS_KEY_ID"],
+            "secret_key": os.environ["AWS_SECRET_ACCESS_KEY"],
+            "region_name": "auto",
+            "signature_version": "s3v4",
+            "querystring_auth": True,
+            "querystring_expire": 86400,
+            "default_acl": None,
+            "file_overwrite": False,
+        },
+    }
+
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # ---------------------------------------------------------------------------
